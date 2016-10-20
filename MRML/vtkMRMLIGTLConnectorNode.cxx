@@ -1280,39 +1280,49 @@ int vtkMRMLIGTLConnectorNode::RegisterMessageConverter(vtkIGTLToMRMLBase* conver
 
   // Check if the same converter has already been registered.
   MessageConverterListType::iterator iter;
-  for (iter = this->MessageConverterList.begin();
-       iter != this->MessageConverterList.end();
-       iter ++)
+  if (this->MessageConverterList.size()>0)
+  {
+    for (iter = this->MessageConverterList.begin();
+         iter != this->MessageConverterList.end();
+         iter ++)
     {
-    if ((converter->GetIGTLName() && strcmp(converter->GetIGTLName(), (*iter)->GetIGTLName()) == 0) &&
+      if ((converter->GetIGTLName() && strcmp(converter->GetIGTLName(), (*iter)->GetIGTLName()) == 0) &&
         (converter->GetMRMLName() && strcmp(converter->GetMRMLName(), (*iter)->GetMRMLName()) == 0))
       {
       return 0;
       }
     }
+  }
 
   // Register the converter
   if (converter->GetIGTLName() && converter->GetMRMLName())
     {
     // check the converter type (single IGTL name or multiple IGTL names?)
     if (converter->GetConverterType() == vtkIGTLToMRMLBase::TYPE_NORMAL)
-      {
+    {
       const char* name = converter->GetIGTLName();
 
       // Check if the name already exists.
       MessageConverterMapType::iterator citer;
-      citer = this->IGTLNameToConverterMap.find(name);
-      if (citer != this->IGTLNameToConverterMap.end()) // exists
+      if (this->IGTLNameToConverterMap.size()>0)
+      {
+        citer = this->IGTLNameToConverterMap.find(name);
+        if (citer != this->IGTLNameToConverterMap.end()) // exists
         {
         std::cerr << "The converter with the same IGTL name has already been registered." << std::endl;
         return 0;
         }
-      else
+        else
         {
         // Add converter to the map
         this->IGTLNameToConverterMap[name] = converter;
         }
       }
+      else
+      {
+        this->IGTLNameToConverterMap[name] = converter;
+      }
+    }
 
     else // vtkIGTLToMRMLBase::TYPE_MULTI_IGTL_NAMES
       {
