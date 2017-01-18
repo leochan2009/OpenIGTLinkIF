@@ -50,11 +50,14 @@ vtkStandardNewMacro(vtkIGTLToMRMLLinearTransform);
 //---------------------------------------------------------------------------
 vtkIGTLToMRMLLinearTransform::vtkIGTLToMRMLLinearTransform()
 {
+  converter = igtl::TransformConverter::New();
+  vtkContent = new igtl::TransformConverter::ContentData();
 }
 
 //---------------------------------------------------------------------------
 vtkIGTLToMRMLLinearTransform::~vtkIGTLToMRMLLinearTransform()
 {
+  delete vtkContent;
 }
 
 //---------------------------------------------------------------------------
@@ -100,73 +103,12 @@ int vtkIGTLToMRMLLinearTransform::IGTLToMRML(igtl::MessageBase::Pointer buffer, 
 {
   vtkIGTLToMRMLBase::IGTLToMRML(buffer, node);
 
-  // Create a message buffer to receive transform data
-  igtl::TransformMessage::Pointer transMsg;
-  transMsg = igtl::TransformMessage::New();
-  transMsg->Copy(buffer);  // !! TODO: copy makes performance issue.
-
-  // Deserialize the transform data
-  // If CheckCRC==0, CRC check is skipped.
-  int c = transMsg->Unpack(this->CheckCRC);
-
-  if (!(c & igtl::MessageHeader::UNPACK_BODY)) // if CRC check fails
-    {
-    // TODO: error handling
-    return 0;
-    }
-
-  if (node == NULL)
-    {
-    return 0;
-    }
-
   vtkMRMLLinearTransformNode* transformNode =
     vtkMRMLLinearTransformNode::SafeDownCast(node);
-
-  igtl::Matrix4x4 matrix;
-  transMsg->GetMatrix(matrix);
-
-  float tx = matrix[0][0];
-  float ty = matrix[1][0];
-  float tz = matrix[2][0];
-  float sx = matrix[0][1];
-  float sy = matrix[1][1];
-  float sz = matrix[2][1];
-  float nx = matrix[0][2];
-  float ny = matrix[1][2];
-  float nz = matrix[2][2];
-  float px = matrix[0][3];
-  float py = matrix[1][3];
-  float pz = matrix[2][3];
-
-  //std::cerr << "\n\nmatrix = " << std::endl;
-  //std::cerr << tx << ", " << ty << ", " << tz << std::endl;
-  //std::cerr << sx << ", " << sy << ", " << sz << std::endl;
-  //std::cerr << nx << ", " << ny << ", " << nz << std::endl;
-  //std::cerr << px << ", " << py << ", " << pz << std::endl;
-
-  // set volume orientation
-  vtkNew<vtkMatrix4x4> transform;
-  transform->Identity();
-  transform->Element[0][0] = tx;
-  transform->Element[1][0] = ty;
-  transform->Element[2][0] = tz;
-  transform->Element[0][1] = sx;
-  transform->Element[1][1] = sy;
-  transform->Element[2][1] = sz;
-  transform->Element[0][2] = nx;
-  transform->Element[1][2] = ny;
-  transform->Element[2][2] = nz;
-  transform->Element[0][3] = px;
-  transform->Element[1][3] = py;
-  transform->Element[2][3] = pz;
-
-  transformNode->SetMatrixTransformToParent(transform.GetPointer());
-
-  //std::cerr << "IGTL matrix = " << std::endl;
-  //transform->Print(cerr);
-  //std::cerr << "MRML matrix = " << std::endl;
-  //transformToParent->Print(cerr);
+  igtl::BaseConverter::HeaderData header;
+  vtkContent->transform = transformNode->GetMatrixTransformToParent();
+  converter->fromIGTL(buffer, &header, vtkContent, 1);
+  transformNode->SetMatrixTransformToParent(vtkContent->transform.GetPointer());
 
   return 1;
 
@@ -181,36 +123,8 @@ int vtkIGTLToMRMLLinearTransform::MRMLToIGTL(unsigned long event, vtkMRMLNode* m
       vtkMRMLLinearTransformNode::SafeDownCast(mrmlNode);
     vtkNew<vtkMatrix4x4> matrix;
     transformNode->GetMatrixTransformToParent(matrix.GetPointer());
-
-    //igtl::TransformMessage::Pointer OutTransformMsg;
-    if (this->OutTransformMsg.IsNull())
-      {
-      this->OutTransformMsg = igtl::TransformMessage::New();
-      }
-
-    this->OutTransformMsg->SetDeviceName(mrmlNode->GetName());
-
-    igtl::Matrix4x4 igtlmatrix;
-
-    igtlmatrix[0][0]  = matrix->Element[0][0];
-    igtlmatrix[1][0]  = matrix->Element[1][0];
-    igtlmatrix[2][0]  = matrix->Element[2][0];
-    igtlmatrix[3][0]  = matrix->Element[3][0];
-    igtlmatrix[0][1]  = matrix->Element[0][1];
-    igtlmatrix[1][1]  = matrix->Element[1][1];
-    igtlmatrix[2][1]  = matrix->Element[2][1];
-    igtlmatrix[3][1]  = matrix->Element[3][1];
-    igtlmatrix[0][2]  = matrix->Element[0][2];
-    igtlmatrix[1][2]  = matrix->Element[1][2];
-    igtlmatrix[2][2]  = matrix->Element[2][2];
-    igtlmatrix[3][2]  = matrix->Element[3][2];
-    igtlmatrix[0][3]  = matrix->Element[0][3];
-    igtlmatrix[1][3]  = matrix->Element[1][3];
-    igtlmatrix[2][3]  = matrix->Element[2][3];
-    igtlmatrix[3][3]  = matrix->Element[3][3];
-
-    this->OutTransformMsg->SetMatrix(igtlmatrix);
-    this->OutTransformMsg->Pack();
+    igtl::BaseConverter::HeaderData header;
+    converter->toIGTL(header, *vtkContent, &this->OutTransformMsg);
 
     *size = this->OutTransformMsg->GetPackSize();
     *igtlMsg = (void*)this->OutTransformMsg->GetPackPointer();

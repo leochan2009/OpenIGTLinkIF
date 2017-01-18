@@ -6,6 +6,7 @@ set(${KIT}_EXPORT_DIRECTIVE "VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT")
 
 set(${KIT}_INCLUDE_DIRECTORIES
   ${Slicer_Base_INCLUDE_DIRS}
+  ${OpenIGTLinkIO_INCLUDE_DIRS}
   ${CMAKE_CURRENT_SOURCE_DIR}/../Logic
   ${CMAKE_CURRENT_BINARY_DIR}/../Logic
   )
@@ -28,6 +29,7 @@ if(OpenIGTLink_PROTOCOL_VERSION GREATER 1)
     vtkMRMLLabelMetaListNode.cxx
     vtkMRMLTextNode.cxx
     vtkIGTLToMRMLPoints.cxx
+    vtkIGTLToMRMLCommand.cxx
     vtkIGTLToMRMLPolyData.cxx
     vtkIGTLToMRMLImageMetaList.cxx
     vtkIGTLToMRMLLabelMetaList.cxx
@@ -43,6 +45,7 @@ endif()
 
 set(${KIT}_TARGET_LIBRARIES
   ${OpenIGTLink_LIBRARIES}
+  ${OpenIGTLinkIO_LIBRARIES}
   ${MRML_LIBRARIES}
   SlicerBaseLogic
   vtkSlicerAnnotationsModuleMRML

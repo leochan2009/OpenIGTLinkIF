@@ -21,6 +21,10 @@
 // OpenIGTLink includes
 #include <igtlMessageBase.h>
 
+// OpenIGTLinkIO include
+#include "igtlBaseConverter.h"
+
+
 // MRML includes
 #include <vtkMRMLNode.h>
 #include <vtkMRMLScene.h>
