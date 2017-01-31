@@ -31,6 +31,7 @@
 #include "vtkIGTLToMRMLSensor.h"
 #include "vtkIGTLToMRMLString.h"
 #include "vtkIGTLToMRMLTrajectory.h"
+#include "vtkIGTLToMRMLVideo.h"
 
 #include "vtkSlicerOpenIGTLinkIFModuleLogicExport.h"
 
@@ -184,6 +185,7 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_LOGIC_EXPORT vtkSlicerOpenIGTLinkIFLogic :
   vtkIGTLToMRMLString*          StringConverter;
   vtkIGTLToMRMLTrackingData*    TrackingDataConverter;
   vtkIGTLToMRMLTrajectory*      TrajectoryConverter;
+  vtkIGTLToMRMLVideo*           VideoStreamConverter;
 
 private:
 

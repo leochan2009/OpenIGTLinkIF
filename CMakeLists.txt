@@ -13,6 +13,9 @@ string(TOUPPER ${MODULE_NAME} MODULE_NAME_UPPER)
 find_package(Slicer REQUIRED)
 include(${Slicer_USE_FILE})
 
+find_package(OpenIGTLink REQUIRED)
+include(${OpenIGTLink_USE_FILE})
+
 # --------------------------------------------------------------------------
 # Check if version 2 protocol is available
 # Features that depnd on OpenIGTLink Protocol 2 are only available

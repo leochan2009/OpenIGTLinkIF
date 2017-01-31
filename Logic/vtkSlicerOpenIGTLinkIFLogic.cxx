@@ -69,6 +69,7 @@ vtkSlicerOpenIGTLinkIFLogic::vtkSlicerOpenIGTLinkIFLogic()
   this->StringConverter          = vtkIGTLToMRMLString::New();
   this->TrackingDataConverter    = vtkIGTLToMRMLTrackingData::New();
   this->TrajectoryConverter      = vtkIGTLToMRMLTrajectory::New();
+  this->VideoStreamConverter     = vtkIGTLToMRMLVideo::New();
   
   
   RegisterMessageConverter(this->LinearTransformConverter);
@@ -84,6 +85,7 @@ vtkSlicerOpenIGTLinkIFLogic::vtkSlicerOpenIGTLinkIFLogic()
   RegisterMessageConverter(this->StringConverter);
   RegisterMessageConverter(this->TrackingDataConverter);
   RegisterMessageConverter(this->TrajectoryConverter);
+  RegisterMessageConverter(this->VideoStreamConverter);
 
   //this->LocatorTransformNode = NULL;
 }
