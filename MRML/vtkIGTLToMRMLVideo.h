@@ -51,7 +51,7 @@ public:
   void PrintSelf(ostream& os, vtkIndent indent);
   
   virtual const char*  GetIGTLName() { return "Video"; };
-  virtual const char*  GetMRMLName() { return "Volume"; };
+  virtual const char*  GetMRMLName() { return "VectorVolume"; };
   virtual vtkIntArray* GetNodeEvents();
   virtual vtkMRMLNode* CreateNewNode(vtkMRMLScene* scene, const char* name);
   virtual int          IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node);

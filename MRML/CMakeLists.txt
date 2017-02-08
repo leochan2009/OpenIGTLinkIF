@@ -39,6 +39,7 @@ if(OpenIGTLink_PROTOCOL_VERSION GREATER 1)
     vtkMRMLIGTLTrackingDataBundleNode.cxx
     vtkMRMLIGTLSensorNode.cxx
     vtkIGTLToMRMLVideo.cxx
+    vtkMRMLBitStreamNode.cxx
     )
 endif()
 

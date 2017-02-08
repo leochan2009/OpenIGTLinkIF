@@ -28,6 +28,7 @@
 // MRML includes
 #include <vtkMRMLVectorVolumeNode.h>
 #include <vtkMRMLVectorVolumeDisplayNode.h>
+#include "vtkMRMLBitStreamNode.h"
 
 // VTK includes
 #include <vtkMatrix4x4.h>
@@ -99,67 +100,75 @@ int vtkIGTLToMRMLVideo::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
 {
   // Create a message buffer to receive image data
   vtkMRMLVectorVolumeNode* volumeNode = vtkMRMLVectorVolumeNode::SafeDownCast(node);
-  
-  igtl::VideoMessage::Pointer videoMsg = igtl::VideoMessage::New();
-  videoMsg->SetMessageHeader(buffer);
-  videoMsg->AllocateBuffer(); // fix it, copy buffer doesn't work
-  memcpy(videoMsg->GetPackBodyPointer(),(unsigned char*) buffer->GetPackBodyPointer(),buffer->GetBodySizeToRead());// !! TODO: copy makes performance issue.
-  // TODO, for multiple video transmission, use meta infomation to link message to different volume node.
-  // generate multiple volumenodes to connect to different video sources
-  
-  
-  // Deserialize the transform data
-  // If CheckCRC==0, CRC check is skipped.
-  int c = videoMsg->Unpack();
-  
-  if (c == 0) // if CRC check fails
+  std::string nodeName(volumeNode->GetName());
+  nodeName.append("_BitStream");
+  vtkCollection* collection =  volumeNode->GetScene()->GetNodesByClassByName("vtkMRMLBitStreamNode", nodeName.c_str());
+  if(collection->GetNumberOfItems())
   {
-    // TODO: error handling
-    return 0;
-  }
-  std::string deviceName(buffer->GetDeviceName()); // buffer has the header information, the videoMsg has not device name information.
-  int currentDecoderIndex = -1;
-  for (int i = 0; i < VideoThreadMaxNumber; i++)
-  {
-    if (deviceName.compare(VideoStreamDecoder[i]->deviceName) == 0)
-    {
-      currentDecoderIndex = i;
-      break;
-    }
-  }
-  if (currentDecoderIndex>=0)
-  {
-    int32_t Width = videoMsg->GetWidth();
-    int32_t Height = videoMsg->GetHeight();
-    if (videoMsg->GetWidth() != this->imageWidth[currentDecoderIndex] ||
-        videoMsg->GetHeight() != this->imageHeight[currentDecoderIndex])
-    {
-      this->imageWidth[currentDecoderIndex] = videoMsg->GetWidth();
-      this->imageHeight[currentDecoderIndex] = videoMsg->GetHeight();
-      this->VideoImageData[currentDecoderIndex]->SetDimensions(Width , Height, 1);
-      this->VideoImageData[currentDecoderIndex]->SetExtent(0, Width-1, 0, Height-1, 0, 0 );
-      this->VideoImageData[currentDecoderIndex]->SetOrigin(-Width/2.0, -Height/2.0, 0);
-      this->VideoImageData[currentDecoderIndex]->AllocateScalars(VTK_UNSIGNED_CHAR,3);
-    }
-    VideoStreamDecoder[currentDecoderIndex]->SetWidth(Width);
-    VideoStreamDecoder[currentDecoderIndex]->SetHeight(Height);
-    int streamLength = videoMsg->GetBitStreamSize();
-    VideoStreamDecoder[currentDecoderIndex]->SetStreamLength(streamLength);
+    vtkMRMLBitStreamNode* bitStreamNode = vtkMRMLBitStreamNode::SafeDownCast(collection->GetItemAsObject(0));
+    igtl::VideoMessage::Pointer videoMsg = igtl::VideoMessage::New();
+    videoMsg->SetMessageHeader(buffer);
+    videoMsg->AllocateBuffer(); // fix it, copy buffer doesn't work
+    memcpy(videoMsg->GetPackBodyPointer(),(unsigned char*) buffer->GetPackBodyPointer(),buffer->GetBodySizeToRead());// !! TODO: copy makes performance issue.
+    // TODO, for multiple video transmission, use meta infomation to link message to different volume node.
+    // generate multiple volumenodes to connect to different video sources
     
-    uint8_t* bitstream = new uint8_t[streamLength];
-    memcpy(bitstream, videoMsg->GetPackFragmentPointer(2), streamLength);
-    if(!VideoStreamDecoder[currentDecoderIndex]->ProcessVideoStream(bitstream))
+    
+    // Deserialize the transform data
+    // If CheckCRC==0, CRC check is skipped.
+    int c = videoMsg->Unpack();
+    
+    if (c == 0) // if CRC check fails
     {
-      delete[] bitstream;
+      // TODO: error handling
       return 0;
     }
-    delete[] bitstream;
-    VideoStreamDecoder[currentDecoderIndex]->YUV420ToRGBConversion((uint8_t*)this->VideoImageData[currentDecoderIndex]->GetScalarPointer(), VideoStreamDecoder[currentDecoderIndex]->decodedNal, Height, Width);
-    this->VideoImageData[currentDecoderIndex]->Modified();
-    volumeNode->SetAndObserveImageData(this->VideoImageData[currentDecoderIndex]);
-    volumeNode->Modified();
-    
-    return 1;
+    std::string deviceName(buffer->GetDeviceName()); // buffer has the header information, the videoMsg has not device name information.
+    int currentDecoderIndex = -1;
+    for (int i = 0; i < VideoThreadMaxNumber; i++)
+    {
+      if (deviceName.compare(VideoStreamDecoder[i]->deviceName) == 0)
+      {
+        currentDecoderIndex = i;
+        break;
+      }
+    }
+    if (currentDecoderIndex>=0)
+    {
+      int32_t Width = videoMsg->GetWidth();
+      int32_t Height = videoMsg->GetHeight();
+      if (videoMsg->GetWidth() != this->imageWidth[currentDecoderIndex] ||
+          videoMsg->GetHeight() != this->imageHeight[currentDecoderIndex])
+      {
+        this->imageWidth[currentDecoderIndex] = videoMsg->GetWidth();
+        this->imageHeight[currentDecoderIndex] = videoMsg->GetHeight();
+        this->VideoImageData[currentDecoderIndex]->SetDimensions(Width , Height, 1);
+        this->VideoImageData[currentDecoderIndex]->SetExtent(0, Width-1, 0, Height-1, 0, 0 );
+        this->VideoImageData[currentDecoderIndex]->SetOrigin(-Width/2.0, -Height/2.0, 0);
+        this->VideoImageData[currentDecoderIndex]->AllocateScalars(VTK_UNSIGNED_CHAR,3);
+      }
+      VideoStreamDecoder[currentDecoderIndex]->SetWidth(Width);
+      VideoStreamDecoder[currentDecoderIndex]->SetHeight(Height);
+      int streamLength = videoMsg->GetBitStreamSize();
+      VideoStreamDecoder[currentDecoderIndex]->SetStreamLength(streamLength);
+      
+      char* bitstream = new char[streamLength];
+      memcpy(bitstream, videoMsg->GetPackFragmentPointer(2), streamLength);
+      bitStreamNode->SetBitStream(bitstream, streamLength);
+      bitStreamNode->Modified();
+      if(!VideoStreamDecoder[currentDecoderIndex]->ProcessVideoStream((igtl_uint8*)bitstream))
+      {
+        delete[] bitstream;
+        return 0;
+      }
+      delete[] bitstream;
+      VideoStreamDecoder[currentDecoderIndex]->YUV420ToRGBConversion((uint8_t*)this->VideoImageData[currentDecoderIndex]->GetScalarPointer(), VideoStreamDecoder[currentDecoderIndex]->decodedNal, Height, Width);
+      this->VideoImageData[currentDecoderIndex]->Modified();
+      volumeNode->SetAndObserveImageData(this->VideoImageData[currentDecoderIndex]);
+      volumeNode->Modified();
+      
+      return 1;
+    }
   }
   return 0;
 }
@@ -212,8 +221,12 @@ vtkMRMLNode* vtkIGTLToMRMLVideo::CreateNewNodeWithMessage(vtkMRMLScene* scene, c
   vtkMRMLVolumeNode* volumeNode = vtkMRMLVectorVolumeNode::New();
   scene->SaveStateForUndo();
   volumeNode = vtkMRMLVectorVolumeNode::New();
-  
   volumeNode->SetName(name);
+  vtkMRMLBitStreamNode* bitStreamNode = vtkMRMLBitStreamNode::New();
+  std::string nodeName(name);
+  nodeName.append("_BitStream");
+  bitStreamNode->SetName(nodeName.c_str());
+  scene->AddNode(bitStreamNode);
   int i = 0;
   for (i = 0; i< VideoThreadMaxNumber; i++)
   {
