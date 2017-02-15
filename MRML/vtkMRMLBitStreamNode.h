@@ -6,10 +6,17 @@
 #include "vtkSlicerOpenIGTLinkIFModuleMRMLExport.h"
 
 // MRML includes
-#include <vtkMRMLNode.h>
+#include <vtkMRMLStorableNode.h>
+#include "vtkMRMLVectorVolumeDisplayNode.h"
+#include "vtkMRMLVectorVolumeNode.h"
+#include "vtkMRMLVolumeArchetypeStorageNode.h"
+#include "vtkIGTLToMRMLVideo.h"
 
 // VTK includes
 #include <vtkStdString.h>
+#include <vtkImageData.h>
+
+class vtkMRMLVectorVolumeNode;
 
 class  VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLBitStreamNode : public vtkMRMLNode
 {
@@ -33,6 +40,8 @@ public:
   /// Copy the node's attributes to this object
   virtual void Copy(vtkMRMLNode *node);
   
+  virtual void SetScene(vtkMRMLScene *scene);
+
   ///
   /// Get node XML tag name (like Volume, Model)
   virtual const char* GetNodeTagName() {return "BitStream";};
@@ -42,9 +51,11 @@ public:
   vtkSetMacro(CodecName, char *);
   vtkGetMacro(CodecName, char *);
   
+  void SetVectorVolumeNode(vtkMRMLVectorVolumeNode* imageData);
   
-  char* GetBitStream()
-  {return BitStream;};
+  vtkMRMLVectorVolumeNode* GetVectorVolumeNode();
+  
+  void DecodeBitStream(char* bitstream, int length);
   
   void SetBitStream(char* bitstream, int length)
   {
@@ -53,9 +64,19 @@ public:
       delete BitStream;
     }
     this->BitStream = new char[length];
+    this->BitStreamLength = length;
     memcpy(BitStream, bitstream, length);
   }
   
+  char* GetBitStream()
+  {
+    return BitStream;
+  };
+  
+  int GetBitStreamLength()
+  {
+    return BitStreamLength;
+  };
   
 protected:
   vtkMRMLBitStreamNode();
@@ -65,6 +86,11 @@ protected:
   
   char* CodecName;
   char* BitStream;
+  int BitStreamLength;
+  vtkMRMLVectorVolumeNode * vectorVolumeNode;
+  
+  vtkIGTLToMRMLVideo* videoDecoder;
+  
 };
 
 #endif

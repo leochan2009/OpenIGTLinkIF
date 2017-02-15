@@ -100,6 +100,7 @@ int vtkIGTLToMRMLVideo::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
 {
   // Create a message buffer to receive image data
   vtkMRMLVectorVolumeNode* volumeNode = vtkMRMLVectorVolumeNode::SafeDownCast(node);
+  int modifyStatus = volumeNode->StartModify();
   std::string nodeName(volumeNode->GetName());
   nodeName.append("_BitStream");
   vtkCollection* collection =  volumeNode->GetScene()->GetNodesByClassByName("vtkMRMLBitStreamNode", nodeName.c_str());
@@ -166,7 +167,7 @@ int vtkIGTLToMRMLVideo::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
       this->VideoImageData[currentDecoderIndex]->Modified();
       volumeNode->SetAndObserveImageData(this->VideoImageData[currentDecoderIndex]);
       volumeNode->Modified();
-      
+      volumeNode->EndModify(modifyStatus);
       return 1;
     }
   }
@@ -225,6 +226,7 @@ vtkMRMLNode* vtkIGTLToMRMLVideo::CreateNewNodeWithMessage(vtkMRMLScene* scene, c
   vtkMRMLBitStreamNode* bitStreamNode = vtkMRMLBitStreamNode::New();
   std::string nodeName(name);
   nodeName.append("_BitStream");
+  bitStreamNode->SetScene(scene);
   bitStreamNode->SetName(nodeName.c_str());
   scene->AddNode(bitStreamNode);
   int i = 0;
