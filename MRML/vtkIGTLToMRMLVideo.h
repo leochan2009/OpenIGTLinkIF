@@ -61,6 +61,8 @@ public:
   
   void CenterImage(vtkMRMLVolumeNode *volumeNode);
   
+  void SetVideoDecoderName(int index, char * name){VideoStreamDecoder[index]->deviceName = name;};
+  
 protected:
   vtkIGTLToMRMLVideo();
   ~vtkIGTLToMRMLVideo();

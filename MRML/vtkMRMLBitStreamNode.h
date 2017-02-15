@@ -54,29 +54,32 @@ public:
   void SetVectorVolumeNode(vtkMRMLVectorVolumeNode* imageData);
   
   vtkMRMLVectorVolumeNode* GetVectorVolumeNode();
-  
-  void DecodeBitStream(char* bitstream, int length);
-  
-  void SetBitStream(char* bitstream, int length)
+
+  void DecodeMessageStream(igtl::MessageBase::Pointer buffer)
   {
-    if(BitStream)
-    {
-      delete BitStream;
-    }
-    this->BitStream = new char[length];
-    this->BitStreamLength = length;
-    memcpy(BitStream, bitstream, length);
-  }
-  
-  char* GetBitStream()
-  {
-    return BitStream;
+    int oldModified = vectorVolumeNode->StartModify();
+    this->vectorVolumeNode->SetName("MacCamera5"); // strip the _BitStream_ characters
+    videoDecoder->SetVideoDecoderName(0, (char*)"MacCamera5");
+    if(this->MessageBufferValid)
+      videoDecoder->IGTLToMRML(this->MessageBuffer, vectorVolumeNode);
+    this->vectorVolumeNode->EndModify(oldModified);
   };
   
-  int GetBitStreamLength()
+  void SetMessageStream(igtl::MessageBase::Pointer buffer)
   {
-    return BitStreamLength;
+    this->MessageBuffer->SetMessageHeader(buffer);
+    this->MessageBuffer->AllocateBuffer();
+    memcpy(this->MessageBuffer->GetPackPointer(), buffer->GetPackPointer(), buffer->GetPackSize());
+    this->MessageBufferValid = true;
   };
+  
+  igtl::MessageBase::Pointer GetMessageStreamBuffer()
+  {
+    return MessageBuffer;
+  };
+  
+  bool GetMessageValid()
+  {return MessageBufferValid;};
   
 protected:
   vtkMRMLBitStreamNode();
@@ -85,9 +88,9 @@ protected:
   void operator=(const vtkMRMLBitStreamNode&);
   
   char* CodecName;
-  char* BitStream;
-  int BitStreamLength;
   vtkMRMLVectorVolumeNode * vectorVolumeNode;
+  igtl::MessageBase::Pointer MessageBuffer;
+  bool MessageBufferValid;
   
   vtkIGTLToMRMLVideo* videoDecoder;
   

@@ -155,7 +155,8 @@ int vtkIGTLToMRMLVideo::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
       
       char* bitstream = new char[streamLength];
       memcpy(bitstream, videoMsg->GetPackFragmentPointer(2), streamLength);
-      bitStreamNode->SetBitStream(bitstream, streamLength);
+      bitStreamNode->SetMessageStream(buffer);
+      //bitStreamNode->SetVectorVolumeNode(volumeNode);
       bitStreamNode->Modified();
       if(!VideoStreamDecoder[currentDecoderIndex]->ProcessVideoStream((igtl_uint8*)bitstream))
       {
