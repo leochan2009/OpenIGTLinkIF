@@ -100,7 +100,6 @@ int vtkIGTLToMRMLVideo::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
 {
   // Create a message buffer to receive image data
   vtkMRMLVectorVolumeNode* volumeNode = vtkMRMLVectorVolumeNode::SafeDownCast(node);
-  int modifyStatus = volumeNode->StartModify();
   std::string nodeName(volumeNode->GetName());
   nodeName.append("_BitStream");
   vtkCollection* collection =  volumeNode->GetScene()->GetNodesByClassByName("vtkMRMLBitStreamNode", nodeName.c_str());
@@ -156,8 +155,6 @@ int vtkIGTLToMRMLVideo::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
       char* bitstream = new char[streamLength];
       memcpy(bitstream, videoMsg->GetPackFragmentPointer(2), streamLength);
       bitStreamNode->SetMessageStream(buffer);
-      //bitStreamNode->SetVectorVolumeNode(volumeNode);
-      bitStreamNode->Modified();
       if(!VideoStreamDecoder[currentDecoderIndex]->ProcessVideoStream((igtl_uint8*)bitstream))
       {
         delete[] bitstream;
@@ -168,7 +165,7 @@ int vtkIGTLToMRMLVideo::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
       this->VideoImageData[currentDecoderIndex]->Modified();
       volumeNode->SetAndObserveImageData(this->VideoImageData[currentDecoderIndex]);
       volumeNode->Modified();
-      volumeNode->EndModify(modifyStatus);
+      //volumeNode->InvokeEvent(vtkMRMLVolumeNode::ImageDataModifiedEvent);
       return 1;
     }
   }
@@ -218,17 +215,19 @@ int vtkIGTLToMRMLVideo::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, i
 //---------------------------------------------------------------------------
 vtkMRMLNode* vtkIGTLToMRMLVideo::CreateNewNodeWithMessage(vtkMRMLScene* scene, const char* name, igtl::MessageBase::Pointer incomingVideoMessage)
 {
-  //vtkMRMLSliceNode* sliceNode = vtkMRMLSliceNode::SafeDownCast(scene->GetNodeByID("vtkMRMLSliceNodeRed"));
-  //sliceNode->Set->SetName(name);
-  vtkMRMLVolumeNode* volumeNode = vtkMRMLVectorVolumeNode::New();
+  vtkMRMLVectorVolumeNode* volumeNode = vtkMRMLVectorVolumeNode::New();
   scene->SaveStateForUndo();
   volumeNode = vtkMRMLVectorVolumeNode::New();
   volumeNode->SetName(name);
   vtkMRMLBitStreamNode* bitStreamNode = vtkMRMLBitStreamNode::New();
   std::string nodeName(name);
   nodeName.append("_BitStream");
-  bitStreamNode->SetScene(scene);
   bitStreamNode->SetName(nodeName.c_str());
+  bitStreamNode->SetVectorVolumeNode(volumeNode);
+  bitStreamNode->SetVideoMessageConverter(this);
+  vtkSmartPointer< vtkIntArray > temp = vtkSmartPointer< vtkIntArray >::New();
+  temp->InsertNextValue(vtkMRMLVolumeNode::ImageDataModifiedEvent);
+  volumeNode->AddObserver(vtkMRMLVolumeNode::ImageDataModifiedEvent, bitStreamNode, &vtkMRMLBitStreamNode::ProcessMRMLEvents);
   scene->AddNode(bitStreamNode);
   int i = 0;
   for (i = 0; i< VideoThreadMaxNumber; i++)

@@ -7,6 +7,7 @@
 #include <vtkCollection.h>
 #include <vtkObjectFactory.h>
 #include <vtkImageData.h>
+#include <vtkMatrix4x4.h>
 //----------------------------------------------------------------------------
 vtkMRMLNodeNewMacro(vtkMRMLBitStreamNode);
 
@@ -14,10 +15,10 @@ vtkMRMLNodeNewMacro(vtkMRMLBitStreamNode);
 vtkMRMLBitStreamNode::vtkMRMLBitStreamNode()
 {
   this->CodecName = new char[10];
-  
   memcpy(this->CodecName, (char *)"H264", 4);
-  vectorVolumeNode = vtkMRMLVectorVolumeNode::New();
-  videoDecoder = vtkIGTLToMRMLVideo::New();
+  vectorVolumeNode = NULL;
+  videoDecoder = NULL;
+  
   MessageBuffer = igtl::MessageBase::New();
   MessageBuffer->InitPack();
   MessageBufferValid = false;
@@ -33,16 +34,9 @@ vtkMRMLBitStreamNode::~vtkMRMLBitStreamNode()
   }
 }
 
-//-----------------------------------------------------------
-void vtkMRMLBitStreamNode::SetScene(vtkMRMLScene *scene)
-{
-  this->Superclass::SetScene(scene);
-  vectorVolumeNode->SetScene(scene);
-}
-
 void vtkMRMLBitStreamNode::SetVectorVolumeNode(vtkMRMLVectorVolumeNode* volumeNode)
 {
-  this->vectorVolumeNode = volumeNode;
+  this->vectorVolumeNode = vtkMRMLVectorVolumeNode::SafeDownCast(volumeNode);
 }
 
 vtkMRMLVectorVolumeNode* vtkMRMLBitStreamNode::GetVectorVolumeNode()

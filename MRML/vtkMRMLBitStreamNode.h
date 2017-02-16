@@ -26,8 +26,26 @@ public:
   vtkTypeMacro(vtkMRMLBitStreamNode,vtkMRMLNode);
   void PrintSelf(ostream& os, vtkIndent indent);
   
+  /// ProxyNodeModifiedEvent is invoked when a proxy node is modified
+  enum
+  {
+    StreamNodeModifiedEvent = 21006
+  };
+  
   virtual vtkMRMLNode* CreateNodeInstance();
   
+  virtual void ProcessMRMLEvents( vtkObject *caller, unsigned long event, void *callData )
+  {
+    this->vtkMRMLNode::ProcessMRMLEvents( caller, event, callData );
+    vtkMRMLNode* modifiedNode = vtkMRMLNode::SafeDownCast(caller);
+    if (modifiedNode == NULL)
+    {
+      // we are only interested in proxy node modified events
+      return;
+    }
+    this->InvokeCustomModifiedEvent(event, this);
+  }
+
   ///
   /// Set node attributes
   virtual void ReadXMLAttributes( const char** atts);
@@ -39,13 +57,12 @@ public:
   ///
   /// Copy the node's attributes to this object
   virtual void Copy(vtkMRMLNode *node);
-  
-  virtual void SetScene(vtkMRMLScene *scene);
 
   ///
   /// Get node XML tag name (like Volume, Model)
   virtual const char* GetNodeTagName() {return "BitStream";};
   
+  //void Update(){this->InvokeCustomModifiedEvent(StreamNodeModifiedEvent, this);};
   ///
   /// Set codec name
   vtkSetMacro(CodecName, char *);
@@ -53,24 +70,31 @@ public:
   
   void SetVectorVolumeNode(vtkMRMLVectorVolumeNode* imageData);
   
+  void SetVideoMessageConverter(vtkIGTLToMRMLVideo* converter)
+  {
+    this->videoDecoder = converter;
+  };
+  
   vtkMRMLVectorVolumeNode* GetVectorVolumeNode();
 
   void DecodeMessageStream(igtl::MessageBase::Pointer buffer)
   {
-    int oldModified = vectorVolumeNode->StartModify();
-    this->vectorVolumeNode->SetName("MacCamera5"); // strip the _BitStream_ characters
-    videoDecoder->SetVideoDecoderName(0, (char*)"MacCamera5");
-    if(this->MessageBufferValid)
-      videoDecoder->IGTLToMRML(this->MessageBuffer, vectorVolumeNode);
-    this->vectorVolumeNode->EndModify(oldModified);
+    if(vectorVolumeNode)
+    {
+      videoDecoder->IGTLToMRML(buffer, vectorVolumeNode);
+    }
+    //this->InvokeCustomModifiedEvent(vtkMRMLVolumeNode::ImageDataModifiedEvent, this);
   };
   
   void SetMessageStream(igtl::MessageBase::Pointer buffer)
   {
     this->MessageBuffer->SetMessageHeader(buffer);
+    //this->MessageBuffer->SetDeviceName("Test");
     this->MessageBuffer->AllocateBuffer();
     memcpy(this->MessageBuffer->GetPackPointer(), buffer->GetPackPointer(), buffer->GetPackSize());
     this->MessageBufferValid = true;
+    //this->InvokeCustomModifiedEvent(vtkMRMLVolumeNode::ImageDataModifiedEvent, this);
+    //this->Modified();
   };
   
   igtl::MessageBase::Pointer GetMessageStreamBuffer()
@@ -78,8 +102,22 @@ public:
     return MessageBuffer;
   };
   
+  void SetMessageValid(bool value)
+  {
+    MessageBufferValid = value
+    ;
+  };
+  
+  void SetVectorVolumeName(const char* name)
+  {
+    this->vectorVolumeNode->SetName(name);
+  }
+  
+  
   bool GetMessageValid()
-  {return MessageBufferValid;};
+  {
+    return MessageBufferValid;
+  };
   
 protected:
   vtkMRMLBitStreamNode();
