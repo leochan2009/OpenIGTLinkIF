@@ -61,6 +61,8 @@ public:
   
   void CenterImage(vtkMRMLVolumeNode *volumeNode);
   
+  VideoStreamIGTLinkReceiver* VideoStreamDecoder[VideoThreadMaxNumber];
+  
 protected:
   vtkIGTLToMRMLVideo();
   ~vtkIGTLToMRMLVideo();
@@ -72,12 +74,6 @@ protected:
   
   igtl::StartVideoDataMessage::Pointer StartVideoMsg;
   igtl::StopVideoMessage::Pointer StopVideoMsg;
-  
-  vtkImageData* VideoImageData[VideoThreadMaxNumber];
-  int imageWidth[VideoThreadMaxNumber];
-  int imageHeight[VideoThreadMaxNumber];
-  
-  VideoStreamIGTLinkReceiver* VideoStreamDecoder[VideoThreadMaxNumber];
 };
 
 

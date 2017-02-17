@@ -16,7 +16,7 @@
 #include <vtkStdString.h>
 #include <vtkImageData.h>
 
-class vtkMRMLVectorVolumeNode;
+static std::string SEQ_BITSTREAM_POSTFIX = "_BitStream";
 
 class  VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLBitStreamNode : public vtkMRMLNode
 {
@@ -25,12 +25,6 @@ public:
   static vtkMRMLBitStreamNode *New();
   vtkTypeMacro(vtkMRMLBitStreamNode,vtkMRMLNode);
   void PrintSelf(ostream& os, vtkIndent indent);
-  
-  /// ProxyNodeModifiedEvent is invoked when a proxy node is modified
-  enum
-  {
-    StreamNodeModifiedEvent = 21006
-  };
   
   virtual vtkMRMLNode* CreateNodeInstance();
   
@@ -62,7 +56,6 @@ public:
   /// Get node XML tag name (like Volume, Model)
   virtual const char* GetNodeTagName() {return "BitStream";};
   
-  //void Update(){this->InvokeCustomModifiedEvent(StreamNodeModifiedEvent, this);};
   ///
   /// Set codec name
   vtkSetMacro(CodecName, char *);
@@ -72,29 +65,27 @@ public:
   
   void SetVideoMessageConverter(vtkIGTLToMRMLVideo* converter)
   {
-    this->videoDecoder = converter;
+    this->converter = converter;
   };
   
   vtkMRMLVectorVolumeNode* GetVectorVolumeNode();
+  
+  void SetUpVolumeAndConverter(const char* name );
 
   void DecodeMessageStream(igtl::MessageBase::Pointer buffer)
   {
     if(vectorVolumeNode)
     {
-      videoDecoder->IGTLToMRML(buffer, vectorVolumeNode);
+       converter->IGTLToMRML(buffer, vectorVolumeNode);
     }
-    //this->InvokeCustomModifiedEvent(vtkMRMLVolumeNode::ImageDataModifiedEvent, this);
   };
   
   void SetMessageStream(igtl::MessageBase::Pointer buffer)
   {
     this->MessageBuffer->SetMessageHeader(buffer);
-    //this->MessageBuffer->SetDeviceName("Test");
     this->MessageBuffer->AllocateBuffer();
     memcpy(this->MessageBuffer->GetPackPointer(), buffer->GetPackPointer(), buffer->GetPackSize());
     this->MessageBufferValid = true;
-    //this->InvokeCustomModifiedEvent(vtkMRMLVolumeNode::ImageDataModifiedEvent, this);
-    //this->Modified();
   };
   
   igtl::MessageBase::Pointer GetMessageStreamBuffer()
@@ -130,7 +121,7 @@ protected:
   igtl::MessageBase::Pointer MessageBuffer;
   bool MessageBufferValid;
   
-  vtkIGTLToMRMLVideo* videoDecoder;
+  vtkIGTLToMRMLVideo* converter;
   
 };
 

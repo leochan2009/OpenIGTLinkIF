@@ -17,7 +17,7 @@ vtkMRMLBitStreamNode::vtkMRMLBitStreamNode()
   this->CodecName = new char[10];
   memcpy(this->CodecName, (char *)"H264", 4);
   vectorVolumeNode = NULL;
-  videoDecoder = NULL;
+  converter = NULL;
   
   MessageBuffer = igtl::MessageBase::New();
   MessageBuffer->InitPack();
@@ -33,6 +33,41 @@ vtkMRMLBitStreamNode::~vtkMRMLBitStreamNode()
     this->CodecName  = NULL;
   }
 }
+
+void vtkMRMLBitStreamNode::SetUpVolumeAndConverter(const char* name)
+{
+  vectorVolumeNode = vtkMRMLVectorVolumeNode::New();
+  vectorVolumeNode->SetName(name);
+  std::string nodeName(name);
+  nodeName.append(SEQ_BITSTREAM_POSTFIX);
+  this->SetName(nodeName.c_str());
+  converter = vtkIGTLToMRMLVideo::New();
+  vectorVolumeNode->AddObserver(vtkMRMLVolumeNode::ImageDataModifiedEvent, this, &vtkMRMLBitStreamNode::ProcessMRMLEvents);
+  int i = 0;
+  for (i = 0; i< VideoThreadMaxNumber; i++)
+  {
+    if (converter->VideoStreamDecoder[i]->deviceName.compare("")==0)
+    {
+      converter->VideoStreamDecoder[i]->deviceName = name;
+      break;
+    }
+  }
+  vtkSmartPointer<vtkImageData> image = vtkSmartPointer<vtkImageData>::New();
+  vectorVolumeNode->SetAndObserveImageData(image);
+  vtkMRMLScene* scene = this->GetScene();
+  if(scene)
+  {
+    scene->SaveStateForUndo();
+    scene->SaveStateForUndo();
+    vtkDebugMacro("Setting scene info");
+    scene->AddNode(vectorVolumeNode);
+    vectorVolumeNode->SetScene(scene);
+    vectorVolumeNode->SetDescription("Received by OpenIGTLink");
+    converter->SetDefaultDisplayNode(vectorVolumeNode,3);
+    converter->CenterImage(vectorVolumeNode);
+  }
+}
+
 
 void vtkMRMLBitStreamNode::SetVectorVolumeNode(vtkMRMLVectorVolumeNode* volumeNode)
 {

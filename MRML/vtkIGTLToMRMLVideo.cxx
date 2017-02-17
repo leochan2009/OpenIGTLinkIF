@@ -48,9 +48,6 @@ vtkIGTLToMRMLVideo::vtkIGTLToMRMLVideo()
   {
     char *configFile[]={(char *)"",(char *)""};
     VideoStreamDecoder[i] = new VideoStreamIGTLinkReceiver(configFile);
-    VideoImageData[i] = vtkImageData::New();
-    imageWidth[i] = 0 ;
-    imageHeight[i] = 0 ;
   }
   
 }
@@ -135,17 +132,16 @@ int vtkIGTLToMRMLVideo::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
     }
     if (currentDecoderIndex>=0)
     {
+      vtkSmartPointer<vtkImageData> imageData = volumeNode->GetImageData();
       int32_t Width = videoMsg->GetWidth();
       int32_t Height = videoMsg->GetHeight();
-      if (videoMsg->GetWidth() != this->imageWidth[currentDecoderIndex] ||
-          videoMsg->GetHeight() != this->imageHeight[currentDecoderIndex])
+      if (videoMsg->GetWidth() != imageData->GetDimensions()[0] ||
+          videoMsg->GetHeight() != imageData->GetDimensions()[1])
       {
-        this->imageWidth[currentDecoderIndex] = videoMsg->GetWidth();
-        this->imageHeight[currentDecoderIndex] = videoMsg->GetHeight();
-        this->VideoImageData[currentDecoderIndex]->SetDimensions(Width , Height, 1);
-        this->VideoImageData[currentDecoderIndex]->SetExtent(0, Width-1, 0, Height-1, 0, 0 );
-        this->VideoImageData[currentDecoderIndex]->SetOrigin(-Width/2.0, -Height/2.0, 0);
-        this->VideoImageData[currentDecoderIndex]->AllocateScalars(VTK_UNSIGNED_CHAR,3);
+        imageData->SetDimensions(Width , Height, 1);
+        imageData->SetExtent(0, Width-1, 0, Height-1, 0, 0 );
+        imageData->SetOrigin(-Width/2.0, -Height/2.0, 0);
+        imageData->AllocateScalars(VTK_UNSIGNED_CHAR,3);
       }
       VideoStreamDecoder[currentDecoderIndex]->SetWidth(Width);
       VideoStreamDecoder[currentDecoderIndex]->SetHeight(Height);
@@ -161,9 +157,9 @@ int vtkIGTLToMRMLVideo::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
         return 0;
       }
       delete[] bitstream;
-      VideoStreamDecoder[currentDecoderIndex]->YUV420ToRGBConversion((uint8_t*)this->VideoImageData[currentDecoderIndex]->GetScalarPointer(), VideoStreamDecoder[currentDecoderIndex]->decodedNal, Height, Width);
-      this->VideoImageData[currentDecoderIndex]->Modified();
-      volumeNode->SetAndObserveImageData(this->VideoImageData[currentDecoderIndex]);
+      VideoStreamDecoder[currentDecoderIndex]->YUV420ToRGBConversion((uint8_t*)imageData->GetScalarPointer(), VideoStreamDecoder[currentDecoderIndex]->decodedNal, Height, Width);
+      imageData->Modified();
+      volumeNode->SetAndObserveImageData(imageData);
       volumeNode->Modified();
       //volumeNode->InvokeEvent(vtkMRMLVolumeNode::ImageDataModifiedEvent);
       return 1;
@@ -225,8 +221,6 @@ vtkMRMLNode* vtkIGTLToMRMLVideo::CreateNewNodeWithMessage(vtkMRMLScene* scene, c
   bitStreamNode->SetName(nodeName.c_str());
   bitStreamNode->SetVectorVolumeNode(volumeNode);
   bitStreamNode->SetVideoMessageConverter(this);
-  vtkSmartPointer< vtkIntArray > temp = vtkSmartPointer< vtkIntArray >::New();
-  temp->InsertNextValue(vtkMRMLVolumeNode::ImageDataModifiedEvent);
   volumeNode->AddObserver(vtkMRMLVolumeNode::ImageDataModifiedEvent, bitStreamNode, &vtkMRMLBitStreamNode::ProcessMRMLEvents);
   scene->AddNode(bitStreamNode);
   int i = 0;
@@ -238,7 +232,8 @@ vtkMRMLNode* vtkIGTLToMRMLVideo::CreateNewNodeWithMessage(vtkMRMLScene* scene, c
       break;
     }
   }
-  volumeNode->SetAndObserveImageData(this->VideoImageData[i]);
+  vtkSmartPointer<vtkImageData> image = vtkSmartPointer<vtkImageData>::New();
+  volumeNode->SetAndObserveImageData(image);
   
   scene->SaveStateForUndo();
   vtkDebugMacro("Setting scene info");
