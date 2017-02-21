@@ -27,44 +27,50 @@ vtkMRMLBitStreamNode::vtkMRMLBitStreamNode()
 //-----------------------------------------------------------------------------
 vtkMRMLBitStreamNode::~vtkMRMLBitStreamNode()
 {
-  if(this->CodecName)
-  {
-    delete this->CodecName;
-    this->CodecName  = NULL;
-  }
 }
 
 void vtkMRMLBitStreamNode::SetUpVolumeAndConverter(const char* name)
 {
-  vectorVolumeNode = vtkMRMLVectorVolumeNode::New();
-  vectorVolumeNode->SetName(name);
-  std::string nodeName(name);
-  nodeName.append(SEQ_BITSTREAM_POSTFIX);
-  this->SetName(nodeName.c_str());
-  converter = vtkIGTLToMRMLVideo::New();
-  vectorVolumeNode->AddObserver(vtkMRMLVolumeNode::ImageDataModifiedEvent, this, &vtkMRMLBitStreamNode::ProcessMRMLEvents);
-  int i = 0;
-  for (i = 0; i< VideoThreadMaxNumber; i++)
-  {
-    if (converter->VideoStreamDecoder[i]->deviceName.compare("")==0)
-    {
-      converter->VideoStreamDecoder[i]->deviceName = name;
-      break;
-    }
-  }
-  vtkSmartPointer<vtkImageData> image = vtkSmartPointer<vtkImageData>::New();
-  vectorVolumeNode->SetAndObserveImageData(image);
   vtkMRMLScene* scene = this->GetScene();
   if(scene)
   {
-    scene->SaveStateForUndo();
+    vtkCollection* collection =  scene->GetNodesByClassByName("vtkMRMLVectorVolumeNode",name);
+    int nCol = collection->GetNumberOfItems();
+    if (nCol > 0)
+    {
+      for (int i = 0; i < nCol; i ++)
+      {
+        this->GetScene()->RemoveNode(vtkMRMLNode::SafeDownCast(collection->GetItemAsObject(i)));
+      }
+    }
+    vectorVolumeNode = vtkMRMLVectorVolumeNode::New();
+    vtkSmartPointer<vtkImageData> image = vtkSmartPointer<vtkImageData>::New();
+    vectorVolumeNode->SetAndObserveImageData(image);
     scene->SaveStateForUndo();
     vtkDebugMacro("Setting scene info");
     scene->AddNode(vectorVolumeNode);
     vectorVolumeNode->SetScene(scene);
     vectorVolumeNode->SetDescription("Received by OpenIGTLink");
+    vectorVolumeNode->SetName(name);
+    std::string nodeName(name);
+    nodeName.append(SEQ_BITSTREAM_POSTFIX);
+    this->SetName(nodeName.c_str());
+    vectorVolumeNode->AddObserver(vtkMRMLVolumeNode::ImageDataModifiedEvent, this, &vtkMRMLBitStreamNode::ProcessMRMLEvents);
+    //------
+    //converter initialization
+    converter = vtkIGTLToMRMLVideo::New();
+    int i = 0;
+    for (i = 0; i< VideoThreadMaxNumber; i++)
+    {
+      if (converter->VideoStreamDecoder[i]->deviceName.compare("")==0)
+      {
+        converter->VideoStreamDecoder[i]->deviceName = name;
+        break;
+      }
+    }
     converter->SetDefaultDisplayNode(vectorVolumeNode,3);
     converter->CenterImage(vectorVolumeNode);
+    //-------
   }
 }
 
