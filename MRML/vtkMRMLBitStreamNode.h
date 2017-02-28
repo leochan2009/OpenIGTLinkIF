@@ -56,10 +56,6 @@ public:
   /// Get node XML tag name (like Volume, Model)
   virtual const char* GetNodeTagName() {return "BitStream";};
   
-  ///
-  /// Set codec name
-  vtkSetMacro(CodecName, char *);
-  vtkGetMacro(CodecName, char *);
   
   void SetVectorVolumeNode(vtkMRMLVectorVolumeNode* imageData);
   
@@ -70,7 +66,7 @@ public:
   
   vtkMRMLVectorVolumeNode* GetVectorVolumeNode();
   
-  void SetUpVolumeAndConverter(const char* name );
+  void SetUpMRMLNodeAndConverter(const char* name );
 
   void DecodeMessageStream(igtl::MessageBase::Pointer buffer)
   {
@@ -116,7 +112,6 @@ protected:
   vtkMRMLBitStreamNode(const vtkMRMLBitStreamNode&);
   void operator=(const vtkMRMLBitStreamNode&);
   
-  char* CodecName;
   vtkMRMLVectorVolumeNode * vectorVolumeNode;
   igtl::MessageBase::Pointer MessageBuffer;
   bool MessageBufferValid;

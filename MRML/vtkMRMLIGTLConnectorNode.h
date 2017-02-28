@@ -60,7 +60,8 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : pub
     DeactivatedEvent      = 118947,
     ReceiveEvent          = 118948,
     NewDeviceEvent        = 118949,
-    DeviceModifiedEvent   = 118950
+    DeviceModifiedEvent   = 118950,
+    IGTLMessageProcessEvent = 118951
   };
 
   enum {
@@ -215,7 +216,10 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : pub
   //----------------------------------------------------------------
   // Circular Buffer
   //----------------------------------------------------------------
-
+  igtl_uint8* CurrentIGTLMessage;
+  int messageLength;
+  vtkMutexLock*     Mutex;
+  int SetCircularBufferFromSimulation(igtl_uint8* inputBuffer);
   typedef std::vector<std::string> NameListType;
   unsigned int GetUpdatedBuffersList(NameListType& nameList); // TODO: this will be moved to private
   vtkIGTLCircularBuffer* GetCircularBuffer(std::string& key);     // TODO: Is it OK to use device name as a key?
@@ -371,7 +375,6 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : pub
   //----------------------------------------------------------------
 
   vtkMultiThreader* Thread;
-  vtkMutexLock*     Mutex;
   igtl::ServerSocket::Pointer  ServerSocket;
   igtl::ClientSocket::Pointer  Socket;
   int               ThreadID;

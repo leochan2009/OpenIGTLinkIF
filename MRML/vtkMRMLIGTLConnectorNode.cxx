@@ -26,6 +26,7 @@ Version:   $Revision: 1.2 $
 
 // MRML includes
 #include <vtkMRMLScene.h>
+#include "vtkMRMLVolumeNode.h"
 
 // VTK includes
 #include <vtkCommand.h>
@@ -81,7 +82,7 @@ vtkMRMLIGTLConnectorNode::vtkMRMLIGTLConnectorNode()
   this->Mutex = vtkMutexLock::New();
   this->CircularBufferMutex = vtkMutexLock::New();
   this->RestrictDeviceName = 0;
-
+  this->CurrentIGTLMessage = NULL;
   this->EventQueueMutex = vtkMutexLock::New();
 
   this->PushOutgoingMessageFlag = 0;
@@ -333,7 +334,7 @@ void vtkMRMLIGTLConnectorNode::Copy(vtkMRMLNode *anode)
 //----------------------------------------------------------------------------
 void vtkMRMLIGTLConnectorNode::ProcessMRMLEvents( vtkObject *caller, unsigned long event, void *callData )
 {
-  Superclass::ProcessMRMLEvents(caller, event, callData);
+  this->vtkMRMLNode::ProcessMRMLEvents( caller, event, callData );
 
   MRMLNodeListType::iterator iter;
   vtkMRMLNode* node = vtkMRMLNode::SafeDownCast(caller);
@@ -352,6 +353,7 @@ void vtkMRMLIGTLConnectorNode::ProcessMRMLEvents( vtkObject *caller, unsigned lo
       this->PushNode(node, event);
       }
     }
+  this->InvokeCustomModifiedEvent(vtkMRMLIGTLConnectorNode::IGTLMessageProcessEvent, this);
 }
 
 
@@ -929,6 +931,59 @@ int vtkMRMLIGTLConnectorNode::ReceiveController()
 }
 
 
+int vtkMRMLIGTLConnectorNode::SetCircularBufferFromSimulation(igtl_uint8* inputBuffer)
+{
+  igtl::MessageHeader::Pointer headerMsg;
+  headerMsg = igtl::MessageHeader::New();
+  headerMsg->InitPack();
+  memcpy(headerMsg->GetPackPointer(), inputBuffer, IGTL_HEADER_SIZE);
+  headerMsg->Unpack();
+  std::string key = headerMsg->GetDeviceName();
+  if (key[0] == '\0')
+  {
+    // The following device name never conflicts with any
+    // device names comming from OpenIGTLink message, since
+    // the number of characters is beyond the limit.
+    std::stringstream ss;
+    ss << "OpenIGTLink_MESSAGE_" << headerMsg->GetDeviceType();
+    key = ss.str();
+  }
+  
+  CircularBufferMap::iterator iter = this->Buffer.find(key);
+  if (iter == this->Buffer.end()) // First time to refer the device name
+  {
+    this->CircularBufferMutex->Lock();
+    this->Buffer[key] = vtkIGTLCircularBuffer::New();
+    this->CircularBufferMutex->Unlock();
+  }
+  
+  //----------------------------------------------------------------
+  // Load to the circular buffer
+  
+  vtkIGTLCircularBuffer* circBuffer = this->Buffer[key];
+  
+  if (circBuffer && circBuffer->StartPush() != -1)
+  {
+    //std::cerr << "Pushing into the circular buffer." << std::endl;
+    circBuffer->StartPush();
+    
+    igtl::MessageBase::Pointer buffer = circBuffer->GetPushBuffer();
+    
+    buffer->SetMessageHeader(headerMsg);
+    buffer->AllocatePack();
+    memcpy(buffer->GetPackBodyPointer(), inputBuffer+IGTL_HEADER_SIZE, buffer->GetPackBodySize());
+    
+    circBuffer->EndPush();
+    
+  }
+  else
+  {
+    return 0;
+  }
+
+  return 1;
+}
+
 //----------------------------------------------------------------------------
 int vtkMRMLIGTLConnectorNode::SendData(int size, unsigned char* data)
 {
@@ -1016,9 +1071,23 @@ void vtkMRMLIGTLConnectorNode::ImportDataFromCircularBuffer()
     {
     vtkIGTLCircularBuffer* circBuffer = GetCircularBuffer(*nameIter);
     circBuffer->StartPull();
-
     igtl::MessageBase::Pointer buffer = circBuffer->GetPullBuffer();
-
+    igtl::MessageHeader::Pointer header = igtl::MessageHeader::New();
+    header->InitBuffer();
+    header->Copy(buffer);
+    igtl_header_convert_byte_order((igtl_header *)header->GetPackPointer());
+    Mutex->Lock();
+    if(this->CurrentIGTLMessage)
+    {
+      delete CurrentIGTLMessage;
+      CurrentIGTLMessage = NULL;
+      messageLength = 0;
+    }
+    CurrentIGTLMessage = new igtl_uint8[buffer->GetBufferSize()];
+    messageLength = buffer->GetBufferSize();
+    memcpy(this->CurrentIGTLMessage, header->GetPackPointer(), IGTL_HEADER_SIZE);
+    memcpy(this->CurrentIGTLMessage + IGTL_HEADER_SIZE, buffer->GetPackBodyPointer(), buffer->GetPackBodySize());
+      Mutex->Unlock();
     MessageConverterMapType::iterator conIter =
       this->IGTLNameToConverterMap.find(buffer->GetDeviceType());
     if (conIter == this->IGTLNameToConverterMap.end()) // couldn't find from the map
@@ -1066,9 +1135,14 @@ void vtkMRMLIGTLConnectorNode::ImportDataFromCircularBuffer()
           (inIter->second).second = ts->GetSecond();
           (inIter->second).nanosecond = ts->GetNanosecond();
           //node->SetAttribute("IGTLTime", )
+          
           node->Modified();  // in case converter doesn't call any Modified()s
           node->DisableModifiedEventOff();
           node->InvokePendingModifiedEvent();
+          //node->AddObserver(vtkCommand::ModifiedEvent, this, &vtkMRMLIGTLConnectorNode::ProcessMRMLEvents);
+
+          //Superclass::ProcessMRMLEvents(node, vtkMRMLVolumeNode::ImageDataModifiedEvent, NULL);
+          this->InvokeEvent(vtkMRMLIGTLConnectorNode::IGTLMessageProcessEvent);
           updatedNode = node;
           }
         found = 1;
@@ -1112,7 +1186,7 @@ void vtkMRMLIGTLConnectorNode::ImportDataFromCircularBuffer()
             buffer->GetTimeStamp(ts);
             nodeInfo->second = ts->GetSecond();
             nodeInfo->nanosecond = ts->GetNanosecond();
-
+            //this->InvokeEvent(vtkMRMLIGTLConnectorNode::IGTLMessageProcessEvent);
             node->Modified();  // in case converter doesn't call any Modifieds itself
             node->DisableModifiedEventOff();
             node->InvokePendingModifiedEvent();
@@ -1134,11 +1208,12 @@ void vtkMRMLIGTLConnectorNode::ImportDataFromCircularBuffer()
               buffer->GetTimeStamp(ts);
               nodeInfo->second = ts->GetSecond();
               nodeInfo->nanosecond = ts->GetNanosecond();
-
+              //this->InvokeEvent(vtkMRMLIGTLConnectorNode::IGTLMessageProcessEvent);
               node->Modified();  // in case converter doesn't call any Modifieds itself
               node->DisableModifiedEventOff();
               node->InvokePendingModifiedEvent();
               updatedNode = node;
+              
               break;
               // TODO: QueueNode supposes that there is only unique combination of type and node name,
               // but it should be able to hold multiple nodes.
@@ -1194,6 +1269,7 @@ void vtkMRMLIGTLConnectorNode::ImportDataFromCircularBuffer()
       (*iter)->InvokeEvent(vtkMRMLIGTLQueryNode::ResponseEvent);
       }
     this->InvokeEvent(vtkMRMLIGTLConnectorNode::ReceiveEvent);
+    this->CurrentIGTLMessage = NULL;
     circBuffer->EndPull();
     }
 
