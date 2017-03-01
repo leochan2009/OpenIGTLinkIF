@@ -353,7 +353,6 @@ void vtkMRMLIGTLConnectorNode::ProcessMRMLEvents( vtkObject *caller, unsigned lo
       this->PushNode(node, event);
       }
     }
-  this->InvokeCustomModifiedEvent(vtkMRMLIGTLConnectorNode::IGTLMessageProcessEvent, this);
 }
 
 
@@ -1139,10 +1138,7 @@ void vtkMRMLIGTLConnectorNode::ImportDataFromCircularBuffer()
           node->Modified();  // in case converter doesn't call any Modified()s
           node->DisableModifiedEventOff();
           node->InvokePendingModifiedEvent();
-          //node->AddObserver(vtkCommand::ModifiedEvent, this, &vtkMRMLIGTLConnectorNode::ProcessMRMLEvents);
-
-          //Superclass::ProcessMRMLEvents(node, vtkMRMLVolumeNode::ImageDataModifiedEvent, NULL);
-          this->InvokeEvent(vtkMRMLIGTLConnectorNode::IGTLMessageProcessEvent);
+          this->InvokeCustomModifiedEvent(vtkMRMLIGTLConnectorNode::IGTLMessageProcessEvent, this);
           updatedNode = node;
           }
         found = 1;
@@ -1186,7 +1182,7 @@ void vtkMRMLIGTLConnectorNode::ImportDataFromCircularBuffer()
             buffer->GetTimeStamp(ts);
             nodeInfo->second = ts->GetSecond();
             nodeInfo->nanosecond = ts->GetNanosecond();
-            //this->InvokeEvent(vtkMRMLIGTLConnectorNode::IGTLMessageProcessEvent);
+            this->InvokeCustomModifiedEvent(vtkMRMLIGTLConnectorNode::IGTLMessageProcessEvent, this);
             node->Modified();  // in case converter doesn't call any Modifieds itself
             node->DisableModifiedEventOff();
             node->InvokePendingModifiedEvent();
@@ -1208,7 +1204,7 @@ void vtkMRMLIGTLConnectorNode::ImportDataFromCircularBuffer()
               buffer->GetTimeStamp(ts);
               nodeInfo->second = ts->GetSecond();
               nodeInfo->nanosecond = ts->GetNanosecond();
-              //this->InvokeEvent(vtkMRMLIGTLConnectorNode::IGTLMessageProcessEvent);
+              this->InvokeCustomModifiedEvent(vtkMRMLIGTLConnectorNode::IGTLMessageProcessEvent, this);
               node->Modified();  // in case converter doesn't call any Modifieds itself
               node->DisableModifiedEventOff();
               node->InvokePendingModifiedEvent();
