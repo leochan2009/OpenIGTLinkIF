@@ -216,14 +216,22 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : pub
   //----------------------------------------------------------------
   // Circular Buffer
   //----------------------------------------------------------------
-  igtl_uint8* CurrentIGTLMessage;
-  int messageLength;
-  vtkMutexLock*     Mutex;
   int SetCircularBufferFromSimulation(igtl_uint8* inputBuffer);
+  int SetCircularBufferFromCurrentMSG();
   typedef std::vector<std::string> NameListType;
   unsigned int GetUpdatedBuffersList(NameListType& nameList); // TODO: this will be moved to private
   vtkIGTLCircularBuffer* GetCircularBuffer(std::string& key);     // TODO: Is it OK to use device name as a key?
-
+  
+  //----------------------------------------------------------------
+  // Export and Import current message
+  //----------------------------------------------------------------
+  unsigned char*  ExportCurrentMessage(long & messageLen);
+  
+  int SetCurrentIGTLMessage(igtl_uint8* message, long messageLength);
+  
+  int CopyCurrentMSGTo(vtkMRMLIGTLConnectorNode * externalNode);
+  
+  std::string GetCurrentMSGType();
   //----------------------------------------------------------------
   // Device Lists
   //----------------------------------------------------------------
@@ -373,8 +381,9 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : pub
   //----------------------------------------------------------------
   // Thread and Socket
   //----------------------------------------------------------------
-
+  
   vtkMultiThreader* Thread;
+  vtkMutexLock*     Mutex;
   igtl::ServerSocket::Pointer  ServerSocket;
   igtl::ClientSocket::Pointer  Socket;
   int               ThreadID;
@@ -386,7 +395,9 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : pub
   //----------------------------------------------------------------
   // Data
   //----------------------------------------------------------------
-
+  igtl_uint8* CurrentIGTLMessage;
+  std::string CurrentIGTLMSGType;
+  long messageLength;
 
   typedef std::map<std::string, vtkIGTLCircularBuffer*> CircularBufferMap;
   CircularBufferMap Buffer;

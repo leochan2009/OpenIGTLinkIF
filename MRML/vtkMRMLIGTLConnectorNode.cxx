@@ -83,6 +83,8 @@ vtkMRMLIGTLConnectorNode::vtkMRMLIGTLConnectorNode()
   this->CircularBufferMutex = vtkMutexLock::New();
   this->RestrictDeviceName = 0;
   this->CurrentIGTLMessage = NULL;
+  this->messageLength = 0;
+  this->CurrentIGTLMSGType = std::string();
   this->EventQueueMutex = vtkMutexLock::New();
 
   this->PushOutgoingMessageFlag = 0;
@@ -164,6 +166,11 @@ vtkMRMLIGTLConnectorNode::~vtkMRMLIGTLConnectorNode()
     {
     this->PushOutgoingMessageMutex->Delete();
     }
+  if(this->CurrentIGTLMessage)
+  {
+    delete this->CurrentIGTLMessage;
+    this->CurrentIGTLMessage = NULL;
+  }
 }
 
 
@@ -929,6 +936,71 @@ int vtkMRMLIGTLConnectorNode::ReceiveController()
 
 }
 
+unsigned char*  vtkMRMLIGTLConnectorNode::ExportCurrentMessage(long & messageLen)
+{
+  if (messageLength >0 )
+  {
+    unsigned char* message = new unsigned char[messageLength];
+    this->Mutex->Lock();
+    messageLen = this->messageLength;
+    memcpy(message, (char*)this->CurrentIGTLMessage, messageLength);
+    this->Mutex->Unlock();
+    return message;
+  }
+  return NULL;
+}
+
+int vtkMRMLIGTLConnectorNode::CopyCurrentMSGTo(vtkMRMLIGTLConnectorNode * externalNode)
+{
+  if(this->messageLength>0)
+  {
+    this->Mutex->Lock();
+    int status = externalNode->SetCurrentIGTLMessage(this->CurrentIGTLMessage, this->messageLength);
+    this->Mutex->Unlock();
+    return status;
+  }
+  return 0;
+}
+
+std::string vtkMRMLIGTLConnectorNode::GetCurrentMSGType()
+{
+  this->Mutex->Lock();
+  std::string messageType = std::string(this->CurrentIGTLMSGType);
+  this->Mutex->Unlock();
+  return messageType;
+}
+
+int vtkMRMLIGTLConnectorNode::SetCurrentIGTLMessage(igtl_uint8* message, long messageLength)
+{
+  if(messageLength>0 && message)
+  {
+    this->Mutex->Lock();
+    this->CurrentIGTLMessage = new igtl_uint8[messageLength];
+    memcpy(this->CurrentIGTLMessage, message, messageLength);
+    this->messageLength = messageLength;
+    igtl::MessageHeader::Pointer headerMsg;
+    headerMsg = igtl::MessageHeader::New();
+    headerMsg->InitPack();
+    memcpy(headerMsg->GetPackPointer(), message, IGTL_HEADER_SIZE);
+    headerMsg->Unpack();
+    this->CurrentIGTLMSGType = std::string(headerMsg->GetDeviceType());
+    this->Mutex->Unlock();
+    return 1;
+  }
+  return 0;
+}
+
+int vtkMRMLIGTLConnectorNode::SetCircularBufferFromCurrentMSG()
+{
+  if(this->CurrentIGTLMessage)
+  {
+    this->Mutex->Lock();
+    int status = this->SetCircularBufferFromSimulation(this->CurrentIGTLMessage);
+    this->Mutex->Unlock();
+    return status;
+  }
+  return 0;
+}
 
 int vtkMRMLIGTLConnectorNode::SetCircularBufferFromSimulation(igtl_uint8* inputBuffer)
 {

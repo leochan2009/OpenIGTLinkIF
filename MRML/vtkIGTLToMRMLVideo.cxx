@@ -99,10 +99,11 @@ int vtkIGTLToMRMLVideo::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
   vtkMRMLVectorVolumeNode* volumeNode = vtkMRMLVectorVolumeNode::SafeDownCast(node);
   std::string nodeName(volumeNode->GetName());
   nodeName.append("_BitStream");
-  vtkCollection* collection =  volumeNode->GetScene()->GetNodesByClassByName("vtkMRMLBitStreamNode", nodeName.c_str());
-  if(collection->GetNumberOfItems())
+  //vtkCollection* collection =  volumeNode->GetScene()->GetNodesByClassByName("vtkMRMLBitStreamNode", nodeName.c_str());
+  const char* bitStreamNodeID = volumeNode->GetAttribute("vtkMRMLVectorVolumeNode.rel_bitStreamID");
+  if(bitStreamNodeID)
   {
-    vtkMRMLBitStreamNode* bitStreamNode = vtkMRMLBitStreamNode::SafeDownCast(collection->GetItemAsObject(0));
+    vtkMRMLBitStreamNode* bitStreamNode = vtkMRMLBitStreamNode::SafeDownCast(volumeNode->GetScene()->GetNodeByID(bitStreamNodeID));
     igtl::VideoMessage::Pointer videoMsg = igtl::VideoMessage::New();
     videoMsg->SetMessageHeader(buffer);
     videoMsg->AllocateBuffer(); // fix it, copy buffer doesn't work
@@ -220,9 +221,11 @@ vtkMRMLNode* vtkIGTLToMRMLVideo::CreateNewNodeWithMessage(vtkMRMLScene* scene, c
   nodeName.append("_BitStream");
   bitStreamNode->SetName(nodeName.c_str());
   bitStreamNode->SetVectorVolumeNode(volumeNode);
+  scene->AddNode(bitStreamNode);
+  volumeNode->SetAttribute("vtkMRMLVectorVolumeNode.rel_bitStreamID", bitStreamNode->GetID());
   bitStreamNode->SetVideoMessageConverter(this);
   volumeNode->AddObserver(vtkMRMLVolumeNode::ImageDataModifiedEvent, bitStreamNode, &vtkMRMLBitStreamNode::ProcessMRMLEvents);
-  scene->AddNode(bitStreamNode);
+  
   int i = 0;
   for (i = 0; i< VideoThreadMaxNumber; i++)
   {
