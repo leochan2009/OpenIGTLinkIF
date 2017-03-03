@@ -131,7 +131,19 @@ int vtkIGTLToMRMLVideo::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
         break;
       }
     }
-    if (currentDecoderIndex>=0)
+    if (currentDecoderIndex<0)
+    {
+      for (int i = 0; i < VideoThreadMaxNumber; i++)
+      {
+        if (VideoStreamDecoder[i]->deviceName.compare("") == 0)
+        {
+          currentDecoderIndex = i;
+          break;
+        }
+      }
+      VideoStreamDecoder[currentDecoderIndex]->deviceName = deviceName;
+    }
+    if(currentDecoderIndex>=0)
     {
       vtkSmartPointer<vtkImageData> imageData = volumeNode->GetImageData();
       int32_t Width = videoMsg->GetWidth();

@@ -938,7 +938,7 @@ int vtkMRMLIGTLConnectorNode::ReceiveController()
 
 unsigned char*  vtkMRMLIGTLConnectorNode::ExportCurrentMessage(long & messageLen)
 {
-  if (messageLength >0 )
+  if (this->messageLength >0 && (this->CurrentIGTLMessage != NULL) )
   {
     unsigned char* message = new unsigned char[messageLength];
     this->Mutex->Lock();
