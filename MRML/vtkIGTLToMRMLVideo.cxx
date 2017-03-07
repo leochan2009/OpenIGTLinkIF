@@ -105,77 +105,127 @@ int vtkIGTLToMRMLVideo::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
   {
     vtkMRMLBitStreamNode* bitStreamNode = vtkMRMLBitStreamNode::SafeDownCast(volumeNode->GetScene()->GetNodeByID(bitStreamNodeID));
     igtl::VideoMessage::Pointer videoMsg = igtl::VideoMessage::New();
-    videoMsg->SetMessageHeader(buffer);
-    videoMsg->AllocateBuffer(); // fix it, copy buffer doesn't work
-    memcpy(videoMsg->GetPackBodyPointer(),(unsigned char*) buffer->GetPackBodyPointer(),buffer->GetBodySizeToRead());// !! TODO: copy makes performance issue.
-    // TODO, for multiple video transmission, use meta infomation to link message to different volume node.
-    // generate multiple volumenodes to connect to different video sources
-    
-    
-    // Deserialize the transform data
-    // If CheckCRC==0, CRC check is skipped.
-    int c = videoMsg->Unpack();
-    
-    if (c == 0) // if CRC check fails
+    videoMsg->SetHeaderVersion(IGTL_HEADER_VERSION_2);
+    igtl::ImageMessage::Pointer imageMsg = igtl::ImageMessage::New();
+    if(strcmp(buffer->GetDeviceType(),"Video")==0)
     {
-      // TODO: error handling
-      return 0;
-    }
-    std::string deviceName(buffer->GetDeviceName()); // buffer has the header information, the videoMsg has not device name information.
-    int currentDecoderIndex = -1;
-    for (int i = 0; i < VideoThreadMaxNumber; i++)
-    {
-      if (deviceName.compare(VideoStreamDecoder[i]->deviceName) == 0)
+      videoMsg->SetMessageHeader(buffer);
+      videoMsg->AllocateBuffer(); // fix it, copy buffer doesn't work
+      memcpy(videoMsg->GetPackBodyPointer(),(unsigned char*) buffer->GetPackBodyPointer(),buffer->GetBodySizeToRead());// !! TODO: copy makes performance issue.
+      // TODO, for multiple video transmission, use meta infomation to link message to different volume node.
+      // generate multiple volumenodes to connect to different video sources
+      
+      
+      // Deserialize the transform data
+      // If CheckCRC==0, CRC check is skipped.
+      int c = videoMsg->Unpack();
+      
+      if (c == 0) // if CRC check fails
       {
-        currentDecoderIndex = i;
-        break;
+        // TODO: error handling
+        return 0;
       }
-    }
-    if (currentDecoderIndex<0)
-    {
+      std::string deviceName(buffer->GetDeviceName()); // buffer has the header information, the videoMsg has not device name information.
+      int currentDecoderIndex = -1;
       for (int i = 0; i < VideoThreadMaxNumber; i++)
       {
-        if (VideoStreamDecoder[i]->deviceName.compare("") == 0)
+        if (deviceName.compare(VideoStreamDecoder[i]->deviceName) == 0)
         {
           currentDecoderIndex = i;
           break;
         }
       }
-      VideoStreamDecoder[currentDecoderIndex]->deviceName = deviceName;
+      if (currentDecoderIndex<0)
+      {
+        for (int i = 0; i < VideoThreadMaxNumber; i++)
+        {
+          if (VideoStreamDecoder[i]->deviceName.compare("") == 0)
+          {
+            currentDecoderIndex = i;
+            break;
+          }
+        }
+        VideoStreamDecoder[currentDecoderIndex]->deviceName = deviceName;
+      }
+      if(currentDecoderIndex>=0)
+      {
+        vtkSmartPointer<vtkImageData> imageData = volumeNode->GetImageData();
+        int32_t Width = videoMsg->GetWidth();
+        int32_t Height = videoMsg->GetHeight();
+        if (videoMsg->GetWidth() != imageData->GetDimensions()[0] ||
+            videoMsg->GetHeight() != imageData->GetDimensions()[1])
+        {
+          imageData->SetDimensions(Width , Height, 1);
+          imageData->SetExtent(0, Width-1, 0, Height-1, 0, 0 );
+          imageData->SetOrigin(-Width/2.0, -Height/2.0, 0);
+          imageData->AllocateScalars(VTK_UNSIGNED_CHAR,3);
+        }
+        VideoStreamDecoder[currentDecoderIndex]->SetWidth(Width);
+        VideoStreamDecoder[currentDecoderIndex]->SetHeight(Height);
+        int streamLength = videoMsg->GetBitStreamSize();
+        VideoStreamDecoder[currentDecoderIndex]->SetStreamLength(streamLength);
+        
+        char* bitstream = new char[streamLength];
+        memcpy(bitstream, videoMsg->GetPackFragmentPointer(2), streamLength);
+        bitStreamNode->SetMessageStream(buffer);
+        if(!VideoStreamDecoder[currentDecoderIndex]->ProcessVideoStream((igtl_uint8*)bitstream))
+        {
+          delete[] bitstream;
+          return 0;
+        }
+        if(videoMsg->GetFrameType()==videoFrameTypeIDR)
+        {
+          bitStreamNode->SetKeyFrameDecodedFlag(true);
+        }
+        else
+        {
+          bitStreamNode->SetKeyFrameDecodedFlag(false);
+        }
+        delete[] bitstream;
+        VideoStreamDecoder[currentDecoderIndex]->YUV420ToRGBConversion((uint8_t*)imageData->GetScalarPointer(), VideoStreamDecoder[currentDecoderIndex]->decodedNal, Height, Width);
+        imageData->Modified();
+        volumeNode->SetAndObserveImageData(imageData);
+        volumeNode->Modified();
+        //volumeNode->InvokeEvent(vtkMRMLVolumeNode::ImageDataModifiedEvent);
+        return 1;
+      }
     }
-    if(currentDecoderIndex>=0)
+    else if(strcmp(buffer->GetDeviceType(),"IMAGE")==0)
     {
+      imageMsg->SetMessageHeader(buffer);
+      imageMsg->AllocateBuffer(); // fix it, copy buffer doesn't work
+      memcpy(imageMsg->GetPackBodyPointer(),(unsigned char*) buffer->GetPackBodyPointer(),buffer->GetBodySizeToRead());// !! TODO: copy makes performance issue.
+      // TODO, for multiple video transmission, use meta infomation to link message to different volume node.
+      // generate multiple volumenodes to connect to different video sources
+      
+      
+      // Deserialize the transform data
+      // If CheckCRC==0, CRC check is skipped.
+      int c = imageMsg->Unpack();
+      
+      if (c == 0) // if CRC check fails
+      {
+        // TODO: error handling
+        return 0;
+      }
+      int size[3];
       vtkSmartPointer<vtkImageData> imageData = volumeNode->GetImageData();
-      int32_t Width = videoMsg->GetWidth();
-      int32_t Height = videoMsg->GetHeight();
-      if (videoMsg->GetWidth() != imageData->GetDimensions()[0] ||
-          videoMsg->GetHeight() != imageData->GetDimensions()[1])
+      imageMsg->GetDimensions(size);
+      int32_t Width = size[0];
+      int32_t Height = size[1];
+      if (Width!= imageData->GetDimensions()[0] ||
+          Height != imageData->GetDimensions()[1])
       {
         imageData->SetDimensions(Width , Height, 1);
         imageData->SetExtent(0, Width-1, 0, Height-1, 0, 0 );
         imageData->SetOrigin(-Width/2.0, -Height/2.0, 0);
         imageData->AllocateScalars(VTK_UNSIGNED_CHAR,3);
       }
-      VideoStreamDecoder[currentDecoderIndex]->SetWidth(Width);
-      VideoStreamDecoder[currentDecoderIndex]->SetHeight(Height);
-      int streamLength = videoMsg->GetBitStreamSize();
-      VideoStreamDecoder[currentDecoderIndex]->SetStreamLength(streamLength);
-      
-      char* bitstream = new char[streamLength];
-      memcpy(bitstream, videoMsg->GetPackFragmentPointer(2), streamLength);
-      bitStreamNode->SetMessageStream(buffer);
-      if(!VideoStreamDecoder[currentDecoderIndex]->ProcessVideoStream((igtl_uint8*)bitstream))
-      {
-        delete[] bitstream;
-        return 0;
-      }
-      delete[] bitstream;
-      VideoStreamDecoder[currentDecoderIndex]->YUV420ToRGBConversion((uint8_t*)imageData->GetScalarPointer(), VideoStreamDecoder[currentDecoderIndex]->decodedNal, Height, Width);
+      memcpy(imageData->GetScalarPointer(),
+             imageMsg->GetScalarPointer(), imageMsg->GetSubVolumeImageSize());
       imageData->Modified();
       volumeNode->SetAndObserveImageData(imageData);
       volumeNode->Modified();
-      //volumeNode->InvokeEvent(vtkMRMLVolumeNode::ImageDataModifiedEvent);
-      return 1;
     }
   }
   return 0;

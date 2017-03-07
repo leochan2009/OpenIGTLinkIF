@@ -22,6 +22,7 @@
 // OpenIGTLink includes
 #include <igtlServerSocket.h>
 #include <igtlClientSocket.h>
+#include <igtl_util.h>
 
 // MRML includes
 #include <vtkMRML.h>

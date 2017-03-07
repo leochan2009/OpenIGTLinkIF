@@ -1146,7 +1146,8 @@ void vtkMRMLIGTLConnectorNode::ImportDataFromCircularBuffer()
     igtl::MessageHeader::Pointer header = igtl::MessageHeader::New();
     header->InitBuffer();
     header->Copy(buffer);
-    igtl_header_convert_byte_order((igtl_header *)header->GetPackPointer());
+    if(igtl_is_little_endian())
+      igtl_header_convert_byte_order((igtl_header *)header->GetPackPointer());
     Mutex->Lock();
     if(this->CurrentIGTLMessage)
     {

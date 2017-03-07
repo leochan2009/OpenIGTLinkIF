@@ -20,6 +20,9 @@ vtkMRMLBitStreamNode::vtkMRMLBitStreamNode()
   MessageBuffer = igtl::MessageBase::New();
   MessageBuffer->InitPack();
   MessageBufferValid = false;
+  ImageMessageBuffer = igtl::ImageMessage::New();
+  ImageMessageBuffer->InitPack();
+  MessageBuffer->InitPack();
 }
 
 //-----------------------------------------------------------------------------

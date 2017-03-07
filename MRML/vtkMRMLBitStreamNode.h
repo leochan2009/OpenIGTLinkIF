@@ -11,6 +11,7 @@
 #include "vtkMRMLVectorVolumeNode.h"
 #include "vtkMRMLVolumeArchetypeStorageNode.h"
 #include "vtkIGTLToMRMLVideo.h"
+#include "vtkIGTLToMRMLImage.h"
 
 // VTK includes
 #include <vtkStdString.h>
@@ -59,9 +60,9 @@ public:
   
   void SetVectorVolumeNode(vtkMRMLVectorVolumeNode* imageData);
   
-  void SetVideoMessageConverter(vtkIGTLToMRMLVideo* converter)
+  void SetVideoMessageConverter(vtkIGTLToMRMLVideo* inConverter)
   {
-    this->converter = converter;
+    this->converter = inConverter;
   };
   
   vtkMRMLVectorVolumeNode* GetVectorVolumeNode();
@@ -72,8 +73,18 @@ public:
   {
     if(vectorVolumeNode)
     {
-       converter->IGTLToMRML(buffer, vectorVolumeNode);
+      converter->IGTLToMRML(buffer, vectorVolumeNode);
     }
+  };
+  
+  void SetKeyFrameDecodedFlag(bool flag)
+  {
+    this->isKeyFrameDecoded = flag;
+  };
+  
+  bool GetKeyFrameDecodedFlag()
+  {
+    return this->isKeyFrameDecoded;
   };
   
   void SetMessageStream(igtl::MessageBase::Pointer buffer)
@@ -89,6 +100,11 @@ public:
     return MessageBuffer;
   };
   
+  igtl::ImageMessage::Pointer GetImageMessageBuffer()
+  {
+    return ImageMessageBuffer;
+  };
+  
   void SetMessageValid(bool value)
   {
     MessageBufferValid = value
@@ -98,7 +114,7 @@ public:
   void SetVectorVolumeName(const char* name)
   {
     this->vectorVolumeNode->SetName(name);
-  }
+  };
   
   
   bool GetMessageValid()
@@ -114,9 +130,12 @@ protected:
   
   vtkMRMLVectorVolumeNode * vectorVolumeNode;
   igtl::MessageBase::Pointer MessageBuffer;
+  igtl::ImageMessage::Pointer ImageMessageBuffer;
   bool MessageBufferValid;
   
   vtkIGTLToMRMLVideo* converter;
+  
+  bool isKeyFrameDecoded;
   
 };
 
