@@ -22,7 +22,7 @@
 #include <igtlMessageBase.h>
 
 // OpenIGTLinkIO include
-#include "igtlBaseConverter.h"
+#include "igtlioBaseConverter.h"
 
 
 // MRML includes

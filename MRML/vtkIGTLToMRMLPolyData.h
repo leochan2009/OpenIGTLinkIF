@@ -21,7 +21,7 @@
 #include <igtlPolyDataMessage.h>
 
 // OpenIGTLinkIO include
-#include "igtlPolyDataConverter.h"
+#include "igtlioPolyDataConverter.h"
 
 // MRML includes
 #include <vtkMRMLNode.h>
@@ -58,9 +58,9 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLToMRMLPolyData : public
   igtl::PolyDataMessage::Pointer OutPolyDataMessage;
   igtl::GetPolyDataMessage::Pointer GetPolyDataMessage;
   
-  igtl::PolyDataConverter::Pointer  converter;
+  igtlio::PolyDataConverter*  converter;
   
-  igtl::PolyDataConverter::MessageContent* vtkContent;
+  igtlio::PolyDataConverter::MessageContent* vtkContent;
 
 };
 

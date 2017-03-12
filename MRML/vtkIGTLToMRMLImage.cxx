@@ -47,13 +47,14 @@ vtkStandardNewMacro(vtkIGTLToMRMLImage);
 //---------------------------------------------------------------------------
 vtkIGTLToMRMLImage::vtkIGTLToMRMLImage()
 {
-  converter = igtl::ImageConverter::New();
-  vtkContent = new igtl::ImageConverter::ContentData();
+  converter = new igtlio::ImageConverter();
+  vtkContent = new igtlio::ImageConverter::ContentData();
 }
 
 //---------------------------------------------------------------------------
 vtkIGTLToMRMLImage::~vtkIGTLToMRMLImage()
 {
+  delete converter;
   delete vtkContent;
 }
 
@@ -218,7 +219,7 @@ int vtkIGTLToMRMLImage::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
     vtkErrorMacro("vtkIGTLToMRMLImage::IGTLToMRML failed: invalid node");
     return 0;
     }
-  igtl::BaseConverter::HeaderData header;
+  igtlio::BaseConverter::HeaderData header;
   vtkContent->image = volumeNode->GetImageData();
   vtkContent->transform = vtkMatrix4x4::New();
   
@@ -255,7 +256,7 @@ int vtkIGTLToMRMLImage::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, i
       }
 
     vtkImageData* imageData = volumeNode->GetImageData();
-    igtl::BaseConverter::HeaderData header;
+    igtlio::BaseConverter::HeaderData header;
     
     vtkContent->image = imageData;
     vtkMatrix4x4 *mat = vtkMatrix4x4::New();

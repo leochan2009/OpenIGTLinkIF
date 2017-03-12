@@ -55,13 +55,14 @@ vtkStandardNewMacro(vtkIGTLToMRMLPolyData);
 //---------------------------------------------------------------------------
 vtkIGTLToMRMLPolyData::vtkIGTLToMRMLPolyData()
 {
-  converter  = igtl::PolyDataConverter::New();
-  vtkContent = new igtl::PolyDataConverter::MessageContent();
+  converter  = new igtlio::PolyDataConverter();
+  vtkContent = new igtlio::PolyDataConverter::MessageContent();
 }
 
 //---------------------------------------------------------------------------
 vtkIGTLToMRMLPolyData::~vtkIGTLToMRMLPolyData()
 {
+  delete converter;
   delete vtkContent;
 }
 
@@ -143,7 +144,7 @@ int vtkIGTLToMRMLPolyData::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRML
     }
 
 
-  igtl::BaseConverter::HeaderData header;
+  igtlio::BaseConverter::HeaderData header;
   vtkContent->polydata = modelNode->GetPolyData();
   
   converter->IGTLToVTK(buffer, vtkContent, 1);
@@ -179,7 +180,7 @@ int vtkIGTLToMRMLPolyData::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode
       }
     
       vtkPolyData* poly = modelNode->GetPolyData();
-      igtl::BaseConverter::HeaderData header;
+      igtlio::BaseConverter::HeaderData header;
       
       vtkContent->polydata = poly;
       converter->VTKToIGTL(*vtkContent, &this->OutPolyDataMessage);

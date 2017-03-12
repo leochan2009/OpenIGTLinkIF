@@ -50,13 +50,14 @@ vtkStandardNewMacro(vtkIGTLToMRMLLinearTransform);
 //---------------------------------------------------------------------------
 vtkIGTLToMRMLLinearTransform::vtkIGTLToMRMLLinearTransform()
 {
-  converter = igtl::TransformConverter::New();
-  vtkContent = new igtl::TransformConverter::ContentData();
+  converter = new igtlio::TransformConverter();
+  vtkContent = new igtlio::TransformConverter::ContentData();
 }
 
 //---------------------------------------------------------------------------
 vtkIGTLToMRMLLinearTransform::~vtkIGTLToMRMLLinearTransform()
 {
+  delete converter;
   delete vtkContent;
 }
 
@@ -105,7 +106,7 @@ int vtkIGTLToMRMLLinearTransform::IGTLToMRML(igtl::MessageBase::Pointer buffer, 
 
   vtkMRMLLinearTransformNode* transformNode =
     vtkMRMLLinearTransformNode::SafeDownCast(node);
-  igtl::BaseConverter::HeaderData header;
+  igtlio::BaseConverter::HeaderData header;
   vtkContent->transform = transformNode->GetMatrixTransformToParent();
   converter->fromIGTL(buffer, &header, vtkContent, 1);
   transformNode->SetMatrixTransformToParent(vtkContent->transform.GetPointer());
@@ -123,7 +124,7 @@ int vtkIGTLToMRMLLinearTransform::MRMLToIGTL(unsigned long event, vtkMRMLNode* m
       vtkMRMLLinearTransformNode::SafeDownCast(mrmlNode);
     vtkNew<vtkMatrix4x4> matrix;
     transformNode->GetMatrixTransformToParent(matrix.GetPointer());
-    igtl::BaseConverter::HeaderData header;
+    igtlio::BaseConverter::HeaderData header;
     converter->toIGTL(header, *vtkContent, &this->OutTransformMsg);
 
     *size = this->OutTransformMsg->GetPackSize();

@@ -20,7 +20,7 @@
 
 #include "igtlCommandMessage.h"
 // OpenIGTLinkIO include
-#include "igtlImageConverter.h"
+#include "igtlioCommandConverter.h"
 
 class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLToMRMLCommand : public vtkIGTLToMRMLBase
 {

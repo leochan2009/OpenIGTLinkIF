@@ -23,7 +23,7 @@
 #include <igtlImageMessage.h>
 
 // OpenIGTLinkIO include
-#include "igtlImageConverter.h"
+#include "igtlioImageConverter.h"
 
 // MRML includes
 #include <vtkMRMLNode.h>
@@ -64,9 +64,9 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLToMRMLImage : public vt
 
   igtl::GetImageMessage::Pointer GetImageMessage;
   
-  igtl::ImageConverter::Pointer  converter;
+  igtlio::ImageConverter*  converter;
   
-  igtl::ImageConverter::ContentData* vtkContent;
+  igtlio::ImageConverter::ContentData* vtkContent;
 
 };
 
