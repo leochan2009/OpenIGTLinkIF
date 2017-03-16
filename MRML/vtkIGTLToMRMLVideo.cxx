@@ -107,7 +107,7 @@ int vtkIGTLToMRMLVideo::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
     igtl::VideoMessage::Pointer videoMsg = igtl::VideoMessage::New();
     videoMsg->SetHeaderVersion(IGTL_HEADER_VERSION_2);
     igtl::ImageMessage::Pointer imageMsg = igtl::ImageMessage::New();
-    if(strcmp(buffer->GetDeviceType(),"Video")==0)
+    if(strcmp(buffer->GetDeviceType(),"VIDEO")==0)
     {
       videoMsg->SetMessageHeader(buffer);
       videoMsg->AllocateBuffer(); // fix it, copy buffer doesn't work
@@ -173,7 +173,18 @@ int vtkIGTLToMRMLVideo::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
           delete[] bitstream;
           return 0;
         }
-        if(videoMsg->GetFrameType()==videoFrameTypeIDR)
+        igtl_uint16 frameType = videoMsg->GetFrameType();
+        
+        if(frameType > 0x00FF)
+        {
+          VideoStreamDecoder[currentDecoderIndex]->IsGrayImage =  true;
+          frameType = frameType >> 8;
+        }
+        else
+        {
+          VideoStreamDecoder[currentDecoderIndex]->IsGrayImage =  false;
+        }
+        if(frameType==videoFrameTypeIDR)
         {
           bitStreamNode->SetKeyFrameDecodedFlag(true);
         }
@@ -182,7 +193,14 @@ int vtkIGTLToMRMLVideo::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
           bitStreamNode->SetKeyFrameDecodedFlag(false);
         }
         delete[] bitstream;
-        VideoStreamDecoder[currentDecoderIndex]->YUV420ToRGBConversion((uint8_t*)imageData->GetScalarPointer(), VideoStreamDecoder[currentDecoderIndex]->decodedNal, Height, Width);
+        if (VideoStreamDecoder[currentDecoderIndex]->IsGrayImage)
+        {
+          VideoStreamDecoder[currentDecoderIndex]->YUV420ToGrayImageConversion((uint8_t*)imageData->GetScalarPointer(), VideoStreamDecoder[currentDecoderIndex]->decodedNal, Height, Width);
+        }
+        else
+        {
+          VideoStreamDecoder[currentDecoderIndex]->YUV420ToRGBConversion((uint8_t*)imageData->GetScalarPointer(), VideoStreamDecoder[currentDecoderIndex]->decodedNal, Height, Width);
+        }
         imageData->Modified();
         volumeNode->SetAndObserveImageData(imageData);
         volumeNode->Modified();
@@ -297,7 +315,43 @@ vtkMRMLNode* vtkIGTLToMRMLVideo::CreateNewNodeWithMessage(vtkMRMLScene* scene, c
       break;
     }
   }
+  int32_t Width = 0;
+  int32_t Height = 0;
   vtkSmartPointer<vtkImageData> image = vtkSmartPointer<vtkImageData>::New();
+  igtl::VideoMessage::Pointer videoMsg = igtl::VideoMessage::New();
+  videoMsg->SetHeaderVersion(IGTL_HEADER_VERSION_2);
+  igtl::ImageMessage::Pointer imageMsg = igtl::ImageMessage::New();
+  if(strcmp(incomingVideoMessage->GetDeviceType(),"Video")==0)
+  {
+    videoMsg->SetMessageHeader(incomingVideoMessage);
+    videoMsg->AllocateBuffer(); // fix it, copy buffer doesn't work
+    memcpy(videoMsg->GetPackBodyPointer(),(unsigned char*) incomingVideoMessage->GetPackBodyPointer(),incomingVideoMessage->GetBodySizeToRead());// !! TODO: copy makes
+    int c = videoMsg->Unpack();
+    if(c>0)
+    {
+      Width = videoMsg->GetWidth();
+      Height = videoMsg->GetHeight();
+    }
+  }
+  else if(strcmp(incomingVideoMessage->GetDeviceType(),"IMAGE")==0)
+  {
+    imageMsg->SetMessageHeader(incomingVideoMessage);
+    imageMsg->AllocateBuffer(); // fix it, copy buffer doesn't work
+    memcpy(imageMsg->GetPackBodyPointer(),(unsigned char*) incomingVideoMessage->GetPackBodyPointer(),incomingVideoMessage->GetBodySizeToRead());// !! TODO: copy makes
+    int c = imageMsg->Unpack();
+    if(c>0)
+    {
+      int size[3];
+      imageMsg->GetDimensions(size);
+      Width = size[0];
+      Height = size[1];
+    }
+  }
+  image->SetDimensions(Width , Height, 1);
+  image->SetExtent(0, Width-1, 0, Height-1, 0, 0 );
+  image->SetOrigin(-Width/2.0, -Height/2.0, 0);
+  image->AllocateScalars(VTK_UNSIGNED_CHAR,3);
+  
   volumeNode->SetAndObserveImageData(image);
   
   scene->SaveStateForUndo();
