@@ -157,7 +157,7 @@ int vtkIGTLToMRMLVideo::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
         {
           imageData->SetDimensions(Width , Height, 1);
           imageData->SetExtent(0, Width-1, 0, Height-1, 0, 0 );
-          imageData->SetOrigin(-Width/2.0, -Height/2.0, 0);
+          imageData->SetOrigin(0, 0, 0);
           imageData->AllocateScalars(VTK_UNSIGNED_CHAR,3);
         }
         VideoStreamDecoder[currentDecoderIndex]->SetWidth(Width);
@@ -236,7 +236,7 @@ int vtkIGTLToMRMLVideo::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
       {
         imageData->SetDimensions(Width , Height, 1);
         imageData->SetExtent(0, Width-1, 0, Height-1, 0, 0 );
-        imageData->SetOrigin(-Width/2.0, -Height/2.0, 0);
+        imageData->SetOrigin(0, 0, 0);
         imageData->AllocateScalars(VTK_UNSIGNED_CHAR,3);
       }
       memcpy(imageData->GetScalarPointer(),
@@ -349,7 +349,7 @@ vtkMRMLNode* vtkIGTLToMRMLVideo::CreateNewNodeWithMessage(vtkMRMLScene* scene, c
   }
   image->SetDimensions(Width , Height, 1);
   image->SetExtent(0, Width-1, 0, Height-1, 0, 0 );
-  image->SetOrigin(-Width/2.0, -Height/2.0, 0);
+  image->SetOrigin(0, 0, 0);
   image->AllocateScalars(VTK_UNSIGNED_CHAR,3);
   
   volumeNode->SetAndObserveImageData(image);
