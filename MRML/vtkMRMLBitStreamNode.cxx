@@ -63,9 +63,9 @@ void vtkMRMLBitStreamNode::SetUpMRMLNodeAndConverter(const char* name)
     int i = 0;
     for (i = 0; i< VideoThreadMaxNumber; i++)
     {
-      if (converter->VideoStreamDecoder[i]->deviceName.compare("")==0)
+      if (converter->VideoStreamDecoder[i]->GetDeviceName().compare("")==0)
       {
-        converter->VideoStreamDecoder[i]->deviceName = name;
+        converter->VideoStreamDecoder[i]->SetDeviceName(name);
         break;
       }
     }
