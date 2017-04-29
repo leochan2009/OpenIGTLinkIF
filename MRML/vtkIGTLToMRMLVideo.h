@@ -21,7 +21,13 @@
 
 // OpenIGTLink includes
 #include <igtlVideoMessage.h>
-#include <H264Decoder.h>
+#if OpenIGTLink_BUILD_H264
+#include "H264Decoder.h"
+#endif
+#if OpenIGTLink_BUILD_VPX
+#include "VPXDecoder.h"
+#endif
+
 
 // MRML includes
 #include <vtkMRMLNode.h>
@@ -62,11 +68,9 @@ public:
   
   void CenterImage(vtkMRMLVolumeNode *volumeNode);
   
-  H264Decoder* VideoStreamDecoder[VideoThreadMaxNumber];
+  GenericDecoder* VideoStreamDecoder[VideoThreadMaxNumber];
   
-  int YUV420ToRGBConversion(igtl_uint8 *RGBFrame, igtl_uint8 * YUV420Frame, int iHeight, int iWidth);
-  
-  int YUV420ToGrayImageConversion(igtl_uint8 *GrayFrame, igtl_uint8 * YUV420Frame, int iHeight, int iWidth);
+  SourcePicture* pDecodedPic;
   
 protected:
   vtkIGTLToMRMLVideo();

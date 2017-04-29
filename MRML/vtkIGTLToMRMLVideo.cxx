@@ -46,9 +46,13 @@ vtkIGTLToMRMLVideo::vtkIGTLToMRMLVideo()
 {
   for (int i = 0; i< VideoThreadMaxNumber; i++)
   {
+#if OpenIGTLink_BUILD_VPX
+    VideoStreamDecoder[i] = new VPXDecoder();
+#elif OpenIGTLink_BUILD_H264
     VideoStreamDecoder[i] = new H264Decoder();
+#endif
   }
-  
+  pDecodedPic = new SourcePicture();
 }
 
 //---------------------------------------------------------------------------
@@ -88,86 +92,6 @@ vtkIntArray* vtkIGTLToMRMLVideo::GetNodeEvents()
   events->InsertNextValue(vtkMRMLHierarchyNode::ChildNodeRemovedEvent);
   
   return events;
-}
-
-
-int vtkIGTLToMRMLVideo::YUV420ToRGBConversion(igtl_uint8 *RGBFrame, igtl_uint8 * YUV420Frame, int iHeight, int iWidth)
-{
-  int componentLength = iHeight*iWidth;
-  const igtl_uint8 *srcY = YUV420Frame;
-  const igtl_uint8 *srcU = YUV420Frame+componentLength;
-  const igtl_uint8 *srcV = YUV420Frame+componentLength*5/4;
-  igtl_uint8 * YUV444 = new igtl_uint8[componentLength * 3];
-  igtl_uint8 *dstY = YUV444;
-  igtl_uint8 *dstU = dstY + componentLength;
-  igtl_uint8 *dstV = dstU + componentLength;
-  
-  memcpy(dstY, srcY, componentLength);
-  const int halfHeight = iHeight/2;
-  const int halfWidth = iWidth/2;
-  
-#pragma omp parallel for default(none) shared(dstV,dstU,srcV,srcU,iWidth)
-  for (int y = 0; y < halfHeight; y++) {
-    for (int x = 0; x < halfWidth; x++) {
-      dstU[2 * x + 2 * y*iWidth] = dstU[2 * x + 1 + 2 * y*iWidth] = srcU[x + y*iWidth/2];
-      dstV[2 * x + 2 * y*iWidth] = dstV[2 * x + 1 + 2 * y*iWidth] = srcV[x + y*iWidth/2];
-    }
-    memcpy(&dstU[(2 * y + 1)*iWidth], &dstU[(2 * y)*iWidth], iWidth);
-    memcpy(&dstV[(2 * y + 1)*iWidth], &dstV[(2 * y)*iWidth], iWidth);
-  }
-  
-  
-  const int yOffset = 16;
-  const int cZero = 128;
-  int yMult, rvMult, guMult, gvMult, buMult;
-  yMult =   76309;
-  rvMult = 117489;
-  guMult = -13975;
-  gvMult = -34925;
-  buMult = 138438;
-  
-  static unsigned char clp_buf[384+256+384];
-  static unsigned char *clip_buf = clp_buf+384;
-  
-  // initialize clipping table
-  memset(clp_buf, 0, 384);
-  
-  for (int i = 0; i < 256; i++) {
-    clp_buf[384+i] = i;
-  }
-  memset(clp_buf+384+256, 255, 384);
-  
-  
-#pragma omp parallel for default(none) shared(dstY,dstU,dstV,RGBFrame,yMult,rvMult,guMult,gvMult,buMult,clip_buf,componentLength)// num_threads(2)
-  for (int i = 0; i < componentLength; ++i) {
-    const int Y_tmp = ((int)dstY[i] - yOffset) * yMult;
-    const int U_tmp = (int)dstU[i] - cZero;
-    const int V_tmp = (int)dstV[i] - cZero;
-    
-    const int R_tmp = (Y_tmp                  + V_tmp * rvMult ) >> 16;//32 to 16 bit conversion by left shifting
-    const int G_tmp = (Y_tmp + U_tmp * guMult + V_tmp * gvMult ) >> 16;
-    const int B_tmp = (Y_tmp + U_tmp * buMult                  ) >> 16;
-    RGBFrame[3*i]   = clip_buf[R_tmp];
-    RGBFrame[3*i+1] = clip_buf[G_tmp];
-    RGBFrame[3*i+2] = clip_buf[B_tmp];
-  }
-  delete [] YUV444;
-  YUV444 = NULL;
-  dstY = NULL;
-  dstU = NULL;
-  dstV = NULL;
-  return 1;
-}
-
-int vtkIGTLToMRMLVideo::YUV420ToGrayImageConversion(igtl_uint8 *GrayFrame, igtl_uint8 * YUV420Frame, int iHeight, int iWidth)
-{
-  int componentLength = iHeight*iWidth;
-  for (int i = 0,j= 0; i < 3*componentLength; i=i+3,j++) {
-    GrayFrame[i] = YUV420Frame[j];
-    GrayFrame[i+1] = YUV420Frame[j];
-    GrayFrame[i+2] = YUV420Frame[j];
-  }
-  return 1;
 }
 
 //---------------------------------------------------------------------------
@@ -237,18 +161,14 @@ int vtkIGTLToMRMLVideo::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
           imageData->SetExtent(0, Width-1, 0, Height-1, 0, 0 );
           imageData->SetOrigin(0, 0, 0);
           imageData->AllocateScalars(VTK_UNSIGNED_CHAR,3);
+          delete pDecodedPic;
+          pDecodedPic = new SourcePicture();
+          pDecodedPic->data[0] = new igtl_uint8[Width * Height*3/2];
         }
-        int streamLength = videoMsg->GetBitStreamSize();
-        char* bitstream = new char[streamLength];
-        memcpy(bitstream, videoMsg->GetPackFragmentPointer(2), streamLength);
-        bitStreamNode->SetMessageStream(buffer);
-        igtl_uint8* outputFrame = new igtl_uint8[Width*Height*3/2];
-        if(!VideoStreamDecoder[currentDecoderIndex]->DecodeBitStreamIntoFrame((igtl_uint8*)bitstream,outputFrame, Width, Height, streamLength))
+        memset(pDecodedPic->data[0], 0, Width * Height * 3 / 2);
+        if(!VideoStreamDecoder[currentDecoderIndex]->DecodeVideoMSGIntoSingleFrame(videoMsg.GetPointer(), pDecodedPic))
         {
-          delete[] bitstream;
-          delete[] outputFrame;
-          bitstream = NULL;
-          outputFrame = NULL;
+          pDecodedPic->~SourcePicture();
           return 0;
         }
         igtl_uint16 frameType = videoMsg->GetFrameType();
@@ -262,7 +182,7 @@ int vtkIGTLToMRMLVideo::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
         {
           isGrayImage =  false;
         }
-        if(frameType==videoFrameTypeIDR)
+        if(frameType==FrameTypeKey)
         {
           bitStreamNode->SetKeyFrameDecodedFlag(true);
         }
@@ -272,19 +192,15 @@ int vtkIGTLToMRMLVideo::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
         }
         if (isGrayImage)
         {
-          this->YUV420ToGrayImageConversion((uint8_t*)imageData->GetScalarPointer(), outputFrame, Height, Width);
+          VideoStreamDecoder[currentDecoderIndex]->ConvertYUVToGrayImage((uint8_t*)imageData->GetScalarPointer(), pDecodedPic->data[0], Height, Width);
         }
         else
         {
-          this->YUV420ToRGBConversion((uint8_t*)imageData->GetScalarPointer(), outputFrame, Height, Width);
+          VideoStreamDecoder[currentDecoderIndex]->ConvertYUVToRGB((uint8_t*)imageData->GetScalarPointer(), pDecodedPic->data[0], Height, Width);
         }
         imageData->Modified();
         volumeNode->SetAndObserveImageData(imageData);
         volumeNode->Modified();
-        delete[] bitstream;
-        delete[] outputFrame;
-        bitstream = NULL;
-        outputFrame = NULL;
         return 1;
       }
     }
@@ -412,6 +328,9 @@ vtkMRMLNode* vtkIGTLToMRMLVideo::CreateNewNodeWithMessage(vtkMRMLScene* scene, c
       Width = videoMsg->GetWidth();
       Height = videoMsg->GetHeight();
     }
+    delete pDecodedPic;
+    pDecodedPic = new SourcePicture();
+    pDecodedPic->data[0] = new igtl_uint8[Width * Height*3/2];
   }
   else if(strcmp(incomingVideoMessage->GetDeviceType(),"IMAGE")==0)
   {
