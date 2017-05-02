@@ -83,6 +83,8 @@ protected:
   
   igtl::StartVideoDataMessage::Pointer StartVideoMsg;
   igtl::StopVideoMessage::Pointer StopVideoMsg;
+  igtl::VideoMessage::Pointer videoMsg;
+  
 };
 
 

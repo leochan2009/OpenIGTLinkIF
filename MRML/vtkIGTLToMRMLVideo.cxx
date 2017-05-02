@@ -53,6 +53,7 @@ vtkIGTLToMRMLVideo::vtkIGTLToMRMLVideo()
 #endif
   }
   pDecodedPic = new SourcePicture();
+  videoMsg = igtl::VideoMessage::New();
 }
 
 //---------------------------------------------------------------------------
@@ -106,7 +107,7 @@ int vtkIGTLToMRMLVideo::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
   if(bitStreamNodeID)
   {
     vtkMRMLBitStreamNode* bitStreamNode = vtkMRMLBitStreamNode::SafeDownCast(volumeNode->GetScene()->GetNodeByID(bitStreamNodeID));
-    igtl::VideoMessage::Pointer videoMsg = igtl::VideoMessage::New();
+    videoMsg->InitPack();
     videoMsg->SetHeaderVersion(IGTL_HEADER_VERSION_2);
     igtl::ImageMessage::Pointer imageMsg = igtl::ImageMessage::New();
     if(strcmp(buffer->GetDeviceType(),"VIDEO")==0)
@@ -116,7 +117,9 @@ int vtkIGTLToMRMLVideo::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
       memcpy(videoMsg->GetPackBodyPointer(),(unsigned char*) buffer->GetPackBodyPointer(),buffer->GetBodySizeToRead());// !! TODO: copy makes performance issue.
       // TODO, for multiple video transmission, use meta infomation to link message to different volume node.
       // generate multiple volumenodes to connect to different video sources
-      
+      FILE* outFile = fopen("UltrasonixBitStream", "a");
+      fwrite(buffer->GetPackPointer(), 1, buffer->GetPackSize(), outFile);
+      fclose(outFile);
       
       // Deserialize the transform data
       // If CheckCRC==0, CRC check is skipped.
@@ -164,9 +167,12 @@ int vtkIGTLToMRMLVideo::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
           delete pDecodedPic;
           pDecodedPic = new SourcePicture();
           pDecodedPic->data[0] = new igtl_uint8[Width * Height*3/2];
+          memset(pDecodedPic->data[0], 0, Width * Height * 3 / 2);
         }
-        memset(pDecodedPic->data[0], 0, Width * Height * 3 / 2);
-        if(!VideoStreamDecoder[currentDecoderIndex]->DecodeVideoMSGIntoSingleFrame(videoMsg.GetPointer(), pDecodedPic))
+        static int count = 0;
+        count ++;
+        std::cerr<<videoMsg->GetBitStreamSize()<<std::endl;
+        if(!VideoStreamDecoder[currentDecoderIndex]->DecodeVideoMSGIntoSingleFrame(videoMsg, pDecodedPic))
         {
           pDecodedPic->~SourcePicture();
           return 0;
@@ -192,11 +198,11 @@ int vtkIGTLToMRMLVideo::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
         }
         if (isGrayImage)
         {
-          VideoStreamDecoder[currentDecoderIndex]->ConvertYUVToGrayImage((uint8_t*)imageData->GetScalarPointer(), pDecodedPic->data[0], Height, Width);
+          VideoStreamDecoder[currentDecoderIndex]->ConvertYUVToGrayImage(pDecodedPic->data[0], (uint8_t*)imageData->GetScalarPointer(), Height, Width);
         }
         else
         {
-          VideoStreamDecoder[currentDecoderIndex]->ConvertYUVToRGB((uint8_t*)imageData->GetScalarPointer(), pDecodedPic->data[0], Height, Width);
+          VideoStreamDecoder[currentDecoderIndex]->ConvertYUVToRGB(pDecodedPic->data[0], (uint8_t*)imageData->GetScalarPointer(),Height, Width);
         }
         imageData->Modified();
         volumeNode->SetAndObserveImageData(imageData);
@@ -317,7 +323,7 @@ vtkMRMLNode* vtkIGTLToMRMLVideo::CreateNewNodeWithMessage(vtkMRMLScene* scene, c
   igtl::VideoMessage::Pointer videoMsg = igtl::VideoMessage::New();
   videoMsg->SetHeaderVersion(IGTL_HEADER_VERSION_2);
   igtl::ImageMessage::Pointer imageMsg = igtl::ImageMessage::New();
-  if(strcmp(incomingVideoMessage->GetDeviceType(),"Video")==0)
+  if(strcmp(incomingVideoMessage->GetDeviceType(),"VIDEO")==0)
   {
     videoMsg->SetMessageHeader(incomingVideoMessage);
     videoMsg->AllocateBuffer(); // fix it, copy buffer doesn't work
@@ -331,6 +337,7 @@ vtkMRMLNode* vtkIGTLToMRMLVideo::CreateNewNodeWithMessage(vtkMRMLScene* scene, c
     delete pDecodedPic;
     pDecodedPic = new SourcePicture();
     pDecodedPic->data[0] = new igtl_uint8[Width * Height*3/2];
+    memset(pDecodedPic->data[0], 0, Width * Height * 3 / 2);
   }
   else if(strcmp(incomingVideoMessage->GetDeviceType(),"IMAGE")==0)
   {
