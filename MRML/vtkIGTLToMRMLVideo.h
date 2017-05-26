@@ -27,6 +27,9 @@
 #if OpenIGTLink_BUILD_VPX
 #include "VPXDecoder.h"
 #endif
+#if OpenIGTLink_LINK_X265
+#include "H265Decoder.h"
+#endif
 
 
 // MRML includes

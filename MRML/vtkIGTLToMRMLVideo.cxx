@@ -46,7 +46,9 @@ vtkIGTLToMRMLVideo::vtkIGTLToMRMLVideo()
 {
   for (int i = 0; i< VideoThreadMaxNumber; i++)
   {
-#if OpenIGTLink_BUILD_VPX
+#if OpenIGTLink_LINK_X265
+    VideoStreamDecoder[i] = new H265Decoder();
+#elif OpenIGTLink_BUILD_VPX
     VideoStreamDecoder[i] = new VPXDecoder();
 #elif OpenIGTLink_BUILD_H264
     VideoStreamDecoder[i] = new H264Decoder();

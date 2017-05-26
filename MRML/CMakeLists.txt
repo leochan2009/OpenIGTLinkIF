@@ -44,7 +44,7 @@ if(OpenIGTLink_PROTOCOL_VERSION GREATER 1)
 endif()
 
 set(${KIT}_TARGET_LIBRARIES
-  ${OpenIGTLink_LIBRARIES}
+  OpenIGTLink
   ${MRML_LIBRARIES}
   SlicerBaseLogic
   vtkSlicerAnnotationsModuleMRML
