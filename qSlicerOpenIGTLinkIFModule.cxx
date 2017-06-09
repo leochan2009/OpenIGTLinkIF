@@ -196,8 +196,27 @@ void qSlicerOpenIGTLinkIFModule::importDataAndEvents()
 {
   vtkMRMLAbstractLogic* l = this->logic();
   vtkSlicerOpenIGTLinkIFLogic * igtlLogic = vtkSlicerOpenIGTLinkIFLogic::SafeDownCast(l);
+  /*-------------
+  std::string fileNameWriting = "/Users/longquanchen/Documents/VideoStreaming/PaperCodecOptimization/UltrasonixEval/UltrasonixDecodingTimeStampWriting.txt";
+  static std::string EvalWritingfilename(fileNameWriting);
+  FILE * pEvalWitingFile = fopen (EvalWritingfilename.c_str(), "ab");
+  std::string line2 = "";
+  igtl::TimeStamp::Pointer timeStamp = igtl::TimeStamp::New();
+  timeStamp->GetTime();
+  line2.append(std::to_string(timeStamp->GetSecond()*1e9+timeStamp->GetNanosecond())).append(" ");
+  */
   if (igtlLogic)
     {
     igtlLogic->CallConnectorTimerHander();
     }
+  /*--------------
+  timeStamp->GetTime();
+  line2.append(std::to_string(timeStamp->GetSecond()*1e9+timeStamp->GetNanosecond())).append("\r\n");
+  if(pEvalWitingFile)
+  {
+    fwrite(line2.c_str(), 1, line2.size(), pEvalWitingFile);
+  }
+  fclose(pEvalWitingFile);
+  pEvalWitingFile = NULL;
+  */
 }

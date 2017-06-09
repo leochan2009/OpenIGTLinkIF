@@ -46,10 +46,10 @@ vtkIGTLToMRMLVideo::vtkIGTLToMRMLVideo()
 {
   for (int i = 0; i< VideoThreadMaxNumber; i++)
   {
-#if OpenIGTLink_LINK_X265
-    VideoStreamDecoder[i] = new H265Decoder();
-#elif OpenIGTLink_BUILD_VPX
+#if OpenIGTLink_BUILD_VPX
     VideoStreamDecoder[i] = new VPXDecoder();
+#elif OpenIGTLink_LINK_X265
+    VideoStreamDecoder[i] = new H265Decoder();
 #elif OpenIGTLink_BUILD_H264
     VideoStreamDecoder[i] = new H264Decoder();
 #endif
@@ -119,9 +119,9 @@ int vtkIGTLToMRMLVideo::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
       memcpy(videoMsg->GetPackBodyPointer(),(unsigned char*) buffer->GetPackBodyPointer(),buffer->GetBodySizeToRead());// !! TODO: copy makes performance issue.
       // TODO, for multiple video transmission, use meta infomation to link message to different volume node.
       // generate multiple volumenodes to connect to different video sources
-      FILE* outFile = fopen("UltrasonixBitStream", "a");
-      fwrite(buffer->GetPackPointer(), 1, buffer->GetPackSize(), outFile);
-      fclose(outFile);
+      //FILE* outFile = fopen("UltrasonixBitStream", "a");
+      //fwrite(buffer->GetPackPointer(), 1, buffer->GetPackSize(), outFile);
+      //fclose(outFile);
       
       // Deserialize the transform data
       // If CheckCRC==0, CRC check is skipped.
@@ -171,14 +171,51 @@ int vtkIGTLToMRMLVideo::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
           pDecodedPic->data[0] = new igtl_uint8[Width * Height*3/2];
           memset(pDecodedPic->data[0], 0, Width * Height * 3 / 2);
         }
-        static int count = 0;
-        count ++;
-        std::cerr<<videoMsg->GetBitStreamSize()<<std::endl;
+        // For latency and frame loss rate evaluatoin
+        std::cerr<<" FrameIndex: "<<videoMsg->GetMessageID()<<" "<<videoMsg->GetBitStreamSize()<<std::endl;
+        
+        FILE* pEvalFile = NULL;
+        igtl::TimeStamp::Pointer timeStamp = igtl::TimeStamp::New();
+        std::string fileNameTemp = "/Users/longquanchen/Documents/VideoStreaming/PaperCodecOptimization/UltrasonixEval/UltrasonixDecodingTimeStamp";
+        fileNameTemp.append(std::to_string(timeStamp->GetSecond())).append(".txt");
+        static std::string Evalfilename(fileNameTemp);
+        static bool headerWritten = false;
+        if (!headerWritten)
+        {
+          timeStamp->GetTime();
+          std::string headline = "MessageID PacketSize TimeFrameFromMachine BeforeDecoding AfterDecoding AfterReconstruction";
+          headline.append("\r\n");
+          pEvalFile = fopen(Evalfilename.c_str(), "ab");
+          fwrite(headline.c_str(), 1, headline.size(), pEvalFile);
+          headerWritten = true;
+          fclose(pEvalFile);
+          pEvalFile = NULL;
+        }
+        pEvalFile = fopen (Evalfilename.c_str(), "ab");
+        std::string line = std::to_string(videoMsg->GetMessageID()).append(" ");
+        line.append(std::to_string(videoMsg->GetBitStreamSize())).append(" ");
+        buffer->GetTimeStamp(timeStamp);
+        line.append(std::to_string(timeStamp->GetSecond()*1e9+timeStamp->GetNanosecond())).append(" ");
+        timeStamp->GetTime();
+        line.append(std::to_string(timeStamp->GetSecond()*1e9+timeStamp->GetNanosecond())).append(" ");
+        //------------------------------------------
+        VideoStreamDecoder[currentDecoderIndex]->SetIsCompressedData(true);
         if(!VideoStreamDecoder[currentDecoderIndex]->DecodeVideoMSGIntoSingleFrame(videoMsg, pDecodedPic))
         {
           pDecodedPic->~SourcePicture();
           return 0;
         }
+        // For latency and frame loss rate evaluatoin
+        timeStamp->GetTime();
+        line.append(std::to_string(timeStamp->GetSecond()*1e9+timeStamp->GetNanosecond())).append(" ");
+        
+        //std::string fileDirectory("/Users/longquanchen/Documents/VideoStreaming/PaperCodecOptimization/UltrasonixEval/");
+        //std::string fileName(std::to_string(videoMsg->GetMessageID()));
+        //FILE* testFile = fopen(fileDirectory.append(fileName).append(".yuv").c_str(), "a");
+        //fwrite(pDecodedPic->data[0], 1, Width * Height, testFile);
+        //fclose(testFile);
+        //testFile = NULL;
+        //-----------------------------------
         igtl_uint16 frameType = videoMsg->GetFrameType();
         bool isGrayImage = false;
         if(frameType > 0x00FF)
@@ -209,6 +246,14 @@ int vtkIGTLToMRMLVideo::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
         imageData->Modified();
         volumeNode->SetAndObserveImageData(imageData);
         volumeNode->Modified();
+        timeStamp->GetTime();
+        line.append(std::to_string(timeStamp->GetSecond()*1e9+timeStamp->GetNanosecond())).append("\r\n");
+        if(pEvalFile)
+        {
+          fwrite(line.c_str(), 1, line.size(), pEvalFile);
+        }
+        fclose(pEvalFile);
+        pEvalFile = NULL;
         return 1;
       }
     }

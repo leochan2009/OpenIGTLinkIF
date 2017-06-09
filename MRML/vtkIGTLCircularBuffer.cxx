@@ -44,8 +44,8 @@ vtkIGTLCircularBuffer::vtkIGTLCircularBuffer()
     this->Data[i]       = NULL;
     this->Messages[i] = igtl::MessageBase::New();
     this->Messages[i]->InitPack();
+    this->MessagesIsProcessed[i] = false;
     }
-
   this->UpdateFlag = 0;
   this->Mutex->Unlock();
 }
@@ -112,6 +112,7 @@ void vtkIGTLCircularBuffer::EndPush()
 {
   this->Mutex->Lock();
   this->Last = this->InPush;
+  this->MessagesIsProcessed[this->InPush] = false;
   this->UpdateFlag = 1;
   this->Mutex->Unlock();
 }
@@ -136,11 +137,23 @@ int vtkIGTLCircularBuffer::StartPull()
   return this->Last;   // return -1 if it is not available
 }
 
+//---------------------------------------------------------------------------
+int vtkIGTLCircularBuffer::StartPullAtIndex(int pullIndex)
+{
+  this->Mutex->Lock();
+  this->InUse = pullIndex;
+  this->UpdateFlag = 0;
+  this->Mutex->Unlock();
+  return this->Last;   // return -1 if it is not available
+}
+
 
 //---------------------------------------------------------------------------
 igtl::MessageBase::Pointer vtkIGTLCircularBuffer::GetPullBuffer()
 {
-  return this->Messages[this->InUse];
+  if(this->MessagesIsProcessed[this->InUse]!=true)
+    return this->Messages[this->InUse];
+  return NULL;
 }
 
 
@@ -148,6 +161,7 @@ igtl::MessageBase::Pointer vtkIGTLCircularBuffer::GetPullBuffer()
 void vtkIGTLCircularBuffer::EndPull()
 {
   this->Mutex->Lock();
+  this->MessagesIsProcessed[this->InUse] = true;
   this->InUse = -1;
   this->Mutex->Unlock();
 }

@@ -911,8 +911,48 @@ int vtkMRMLIGTLConnectorNode::ReceiveController()
       igtl::MessageBase::Pointer buffer = circBuffer->GetPushBuffer();
       buffer->SetMessageHeader(headerMsg);
       buffer->AllocatePack();
-
+      //-----------------------------------
+      //For latency and frame loss rate evaluatoin
+      FILE* pEvalFile = NULL;
+      igtl::TimeStamp::Pointer timeStamp = igtl::TimeStamp::New();
+      std::string fileNameTemp = "/Users/longquanchen/Documents/VideoStreaming/PaperCodecOptimization/UltrasonixEval/UltrasonixBufferTimeStamp";
+      fileNameTemp.append(std::to_string(timeStamp->GetSecond())).append(".txt");
+      static std::string Evalfilename(fileNameTemp);
+      static bool headerWritten = false;
+      if (!headerWritten)
+      {
+        timeStamp->GetTime();
+        std::string headline = "MessageID BeforeReceivingPacket AfterReceivingPacket";
+        headline.append("\r\n");
+        pEvalFile = fopen(Evalfilename.c_str(), "ab");
+        fwrite(headline.c_str(), 1, headline.size(), pEvalFile);
+        headerWritten = true;
+        fclose(pEvalFile);
+        pEvalFile = NULL;
+      }
+      pEvalFile = fopen (Evalfilename.c_str(), "ab");
+      timeStamp->GetTime();
+      std::string line = std::to_string(timeStamp->GetSecond()*1e9+timeStamp->GetNanosecond()).append(" ");
+      //-----------------------------------
       int read = this->Socket->Receive(buffer->GetPackBodyPointer(), buffer->GetPackBodySize());
+      igtlUint32 messageID = 0;
+      messageID = *(igtlUint32*)((char*) buffer->GetPackBodyPointer() + 8);
+      if(igtl_is_little_endian())
+      {
+        messageID = BYTE_SWAP_INT32(messageID);
+      }
+      line.insert(0, std::to_string(messageID).append(" "));
+      //-----------------------------------
+      //For latency and frame loss rate evaluatoin
+      timeStamp->GetTime();
+      line.append(std::to_string(timeStamp->GetSecond()*1e9+timeStamp->GetNanosecond())).append("\r\n");
+      if(pEvalFile && headerMsg->GetMessageType() == "VIDEO")
+      {
+        fwrite(line.c_str(), 1, line.size(), pEvalFile);
+      }
+      fclose(pEvalFile);
+      pEvalFile = NULL;
+      //-----------------------------------
       if (read != buffer->GetPackBodySize())
         {
         vtkErrorMacro ("Only read " << read << " but expected to read "
@@ -1109,7 +1149,8 @@ unsigned int vtkMRMLIGTLConnectorNode::GetUpdatedBuffersList(NameListType& nameL
     {
     if (iter->second != NULL && iter->second->IsUpdated())
       {
-      nameList.push_back(iter->first);
+        
+        nameList.push_back(iter->first);
       }
     }
   return nameList.size();
@@ -1140,139 +1181,140 @@ void vtkMRMLIGTLConnectorNode::ImportDataFromCircularBuffer()
   vtkMRMLIGTLConnectorNode::NameListType::iterator nameIter;
   for (nameIter = nameList.begin(); nameIter != nameList.end(); nameIter ++)
     {
-    vtkIGTLCircularBuffer* circBuffer = GetCircularBuffer(*nameIter);
-    circBuffer->StartPull();
-    igtl::MessageBase::Pointer buffer = circBuffer->GetPullBuffer();
-    igtl::MessageHeader::Pointer header = igtl::MessageHeader::New();
-    header->InitBuffer();
-    header->Copy(buffer);
-    if(igtl_is_little_endian())
-      igtl_header_convert_byte_order((igtl_header *)header->GetPackPointer());
-    Mutex->Lock();
-    if(this->CurrentIGTLMessage)
-    {
-      delete CurrentIGTLMessage;
-      CurrentIGTLMessage = NULL;
-      messageLength = 0;
-    }
-    CurrentIGTLMessage = new igtl_uint8[buffer->GetBufferSize()];
-    messageLength = buffer->GetBufferSize();
-    memcpy(this->CurrentIGTLMessage, header->GetPackPointer(), IGTL_HEADER_SIZE);
-    memcpy(this->CurrentIGTLMessage + IGTL_HEADER_SIZE, buffer->GetPackBodyPointer(), buffer->GetPackBodySize());
-      Mutex->Unlock();
-    MessageConverterMapType::iterator conIter =
-      this->IGTLNameToConverterMap.find(buffer->GetDeviceType());
-    if (conIter == this->IGTLNameToConverterMap.end()) // couldn't find from the map
+      int messageToProcess = 0;
+      vtkIGTLCircularBuffer* circBuffer = GetCircularBuffer(*nameIter);
+      if (nameIter->compare("Image_Reference")==0)
       {
-      continue;
+        messageToProcess = circBuffer->StartPull();
       }
-
-    if (strncmp("OpenIGTLink_MESSAGE_", (*nameIter).c_str(), IGTL_HEADER_NAME_SIZE) == 0)
+      for(int messageIndex=0; messageIndex<=messageToProcess;messageIndex++)
       {
-      buffer->SetDeviceName("OpenIGTLink");
-      }
-
-    vtkIGTLToMRMLBase* converter = conIter->second;
-
-    vtkMRMLScene* scene = this->GetScene();
-
-    vtkMRMLNode* updatedNode = NULL;
-
-    int found = 0;
-
-    // look up the incoming MRML node list
-    NodeInfoMapType::iterator inIter;
-    for (inIter = this->IncomingMRMLNodeInfoMap.begin();
-         inIter != this->IncomingMRMLNodeInfoMap.end();
-         inIter ++)
-      {
-      //vtkMRMLNode* node = (*inIter).node;
-      //vtkMRMLNode* node = (inIter->second).node;
-      vtkMRMLNode* node = scene->GetNodeByID((inIter->first));
-      int unpackStatus = converter->UnpackIGTLMessage(buffer);
-      if (node && unpackStatus &&
-          strcmp(node->GetNodeTagName(), converter->GetMRMLName()) == 0 &&
-          strcmp(node->GetName(), (*nameIter).c_str()) == 0)
+        if (nameIter->compare("Image_Reference")==0)
         {
-        //if ((*inIter).lock == 0)
-        if ((inIter->second).lock == 0)
+          if(circBuffer->StartPullAtIndex(messageIndex)<messageToProcess)// Last index reach the end of the circular buffer
           {
-          node->DisableModifiedEventOn();
-          converter->IGTLToMRML(buffer, node);
-          // Save OpenIGTLink time stamp
-          igtl::TimeStamp::Pointer ts = igtl::TimeStamp::New();
-          buffer->GetTimeStamp(ts);
-          //(*inIter).second = ts->GetSecond();
-          //(*inIter).nanosecond = ts->GetNanosecond();
-          (inIter->second).second = ts->GetSecond();
-          (inIter->second).nanosecond = ts->GetNanosecond();
-          //node->SetAttribute("IGTLTime", )
-          
-          node->Modified();  // in case converter doesn't call any Modified()s
-          node->DisableModifiedEventOff();
-          node->InvokePendingModifiedEvent();
-          this->InvokeCustomModifiedEvent(vtkMRMLIGTLConnectorNode::IGTLMessageProcessEvent, this);
-          updatedNode = node;
+            circBuffer->EndPull();
+            break;
           }
-        found = 1;
-        break;
         }
-      }
-
-    if (!found)
+        else
+        {
+          circBuffer->StartPull();
+        }
+      igtl::MessageBase::Pointer buffer = circBuffer->GetPullBuffer();
+      if(buffer.GetPointer() == NULL)
       {
-      // If the incoming data is not restricted by name and type, search the scene as well.
-      if (!this->RestrictDeviceName)
+        circBuffer->EndPull();
+        continue;
+      }
+      igtl::MessageHeader::Pointer header = igtl::MessageHeader::New();
+      header->InitBuffer();
+      header->Copy(buffer);
+      if(igtl_is_little_endian())
+        igtl_header_convert_byte_order((igtl_header *)header->GetPackPointer());
+      Mutex->Lock();
+      if(this->CurrentIGTLMessage)
+      {
+        delete CurrentIGTLMessage;
+        CurrentIGTLMessage = NULL;
+        messageLength = 0;
+      }
+      CurrentIGTLMessage = new igtl_uint8[buffer->GetBufferSize()];
+      messageLength = buffer->GetBufferSize();
+      memcpy(this->CurrentIGTLMessage, header->GetPackPointer(), IGTL_HEADER_SIZE);
+      memcpy(this->CurrentIGTLMessage + IGTL_HEADER_SIZE, buffer->GetPackBodyPointer(), buffer->GetPackBodySize());
+        Mutex->Unlock();
+      MessageConverterMapType::iterator conIter =
+        this->IGTLNameToConverterMap.find(buffer->GetDeviceType());
+      if (conIter == this->IGTLNameToConverterMap.end()) // couldn't find from the map
         {
+        continue;
+        }
+
+      if (strncmp("OpenIGTLink_MESSAGE_", (*nameIter).c_str(), IGTL_HEADER_NAME_SIZE) == 0)
+        {
+        buffer->SetDeviceName("OpenIGTLink");
+        }
+
+      vtkIGTLToMRMLBase* converter = conIter->second;
+
+      vtkMRMLScene* scene = this->GetScene();
+
+      vtkMRMLNode* updatedNode = NULL;
+
+      int found = 0;
+
+      // look up the incoming MRML node list
+      NodeInfoMapType::iterator inIter;
+      for (inIter = this->IncomingMRMLNodeInfoMap.begin();
+           inIter != this->IncomingMRMLNodeInfoMap.end();
+           inIter ++)
+        {
+        //vtkMRMLNode* node = (*inIter).node;
+        //vtkMRMLNode* node = (inIter->second).node;
+        vtkMRMLNode* node = scene->GetNodeByID((inIter->first));
         int unpackStatus = converter->UnpackIGTLMessage(buffer);
-        if(unpackStatus)
-        {
-          const char* classname = scene->GetClassNameByTag(converter->GetMRMLName());
-          vtkCollection* collectiontemp = scene->GetNodesByClassByName(classname, buffer->GetDeviceName());
-          //----------------------
-          //GetNodesByClassByName() is buggy, vtkMRMLVectorVolumeNode.IsA("vtkMRMLScalarVolumeNode") == 1, so when ask for scalar volume, the collection contains a vector volume
-          vtkCollection* collection = vtkCollection::New();
-          for (int i = 0; i < collectiontemp->GetNumberOfItems(); i ++)
+        if (node && unpackStatus &&
+            strcmp(node->GetNodeTagName(), converter->GetMRMLName()) == 0 &&
+            strcmp(node->GetName(), (*nameIter).c_str()) == 0)
           {
-            vtkMRMLNode* node = vtkMRMLNode::SafeDownCast(collectiontemp->GetItemAsObject(i));
-            if(strcmp(node->GetClassName(),classname)==0)
+          //if ((*inIter).lock == 0)
+          if ((inIter->second).lock == 0)
             {
-              collection->AddItem(node);
-            }
-          }
-          //-----------------------
-          int nCol = collection->GetNumberOfItems();
-          if (nCol == 0)
-          {
-            // Call the advanced creation call first to see if the requested converter needs the message itself
-            vtkMRMLNode* node = converter->CreateNewNodeWithMessage(this->GetScene(), buffer->GetDeviceName(), buffer);
-            NodeInfoType* nodeInfo = RegisterIncomingMRMLNode(node);
             node->DisableModifiedEventOn();
             converter->IGTLToMRML(buffer, node);
-
             // Save OpenIGTLink time stamp
             igtl::TimeStamp::Pointer ts = igtl::TimeStamp::New();
             buffer->GetTimeStamp(ts);
-            nodeInfo->second = ts->GetSecond();
-            nodeInfo->nanosecond = ts->GetNanosecond();
-            this->InvokeCustomModifiedEvent(vtkMRMLIGTLConnectorNode::IGTLMessageProcessEvent, this);
-            node->Modified();  // in case converter doesn't call any Modifieds itself
+            //(*inIter).second = ts->GetSecond();
+            //(*inIter).nanosecond = ts->GetNanosecond();
+            (inIter->second).second = ts->GetSecond();
+            (inIter->second).nanosecond = ts->GetNanosecond();
+            //node->SetAttribute("IGTLTime", )
+            
+            node->Modified();  // in case converter doesn't call any Modified()s
             node->DisableModifiedEventOff();
             node->InvokePendingModifiedEvent();
+            this->InvokeCustomModifiedEvent(vtkMRMLIGTLConnectorNode::IGTLMessageProcessEvent, this);
             updatedNode = node;
-            this->InvokeEvent(vtkMRMLIGTLConnectorNode::NewDeviceEvent, node);
             }
-          else
+          found = 1;
+          break;
+          }
+        }
+
+      if (!found)
+        {
+        // If the incoming data is not restricted by name and type, search the scene as well.
+        if (!this->RestrictDeviceName)
+          {
+          int unpackStatus = converter->UnpackIGTLMessage(buffer);
+          if(unpackStatus)
+          {
+            const char* classname = scene->GetClassNameByTag(converter->GetMRMLName());
+            vtkCollection* collectiontemp = scene->GetNodesByClassByName(classname, buffer->GetDeviceName());
+            //----------------------
+            //GetNodesByClassByName() is buggy, vtkMRMLVectorVolumeNode.IsA("vtkMRMLScalarVolumeNode") == 1, so when ask for scalar volume, the collection contains a vector volume
+            vtkCollection* collection = vtkCollection::New();
+            for (int i = 0; i < collectiontemp->GetNumberOfItems(); i ++)
             {
-            for (int i = 0; i < nCol; i ++)
+              vtkMRMLNode* node = vtkMRMLNode::SafeDownCast(collectiontemp->GetItemAsObject(i));
+              if(strcmp(node->GetClassName(),classname)==0)
               {
-              vtkMRMLNode* node = vtkMRMLNode::SafeDownCast(collection->GetItemAsObject(i));
+                collection->AddItem(node);
+              }
+            }
+            //-----------------------
+            int nCol = collection->GetNumberOfItems();
+            if (nCol == 0)
+            {
+              // Call the advanced creation call first to see if the requested converter needs the message itself
+              vtkMRMLNode* node = converter->CreateNewNodeWithMessage(this->GetScene(), buffer->GetDeviceName(), buffer);
               NodeInfoType* nodeInfo = RegisterIncomingMRMLNode(node);
               node->DisableModifiedEventOn();
               converter->IGTLToMRML(buffer, node);
 
               // Save OpenIGTLink time stamp
-              // TODO: avoid calling New() every time.
               igtl::TimeStamp::Pointer ts = igtl::TimeStamp::New();
               buffer->GetTimeStamp(ts);
               nodeInfo->second = ts->GetSecond();
@@ -1282,63 +1324,86 @@ void vtkMRMLIGTLConnectorNode::ImportDataFromCircularBuffer()
               node->DisableModifiedEventOff();
               node->InvokePendingModifiedEvent();
               updatedNode = node;
-              
-              break;
-              // TODO: QueueNode supposes that there is only unique combination of type and node name,
-              // but it should be able to hold multiple nodes.
+              this->InvokeEvent(vtkMRMLIGTLConnectorNode::NewDeviceEvent, node);
               }
+            else
+              {
+              for (int i = 0; i < nCol; i ++)
+                {
+                vtkMRMLNode* node = vtkMRMLNode::SafeDownCast(collection->GetItemAsObject(i));
+                NodeInfoType* nodeInfo = RegisterIncomingMRMLNode(node);
+                node->DisableModifiedEventOn();
+                converter->IGTLToMRML(buffer, node);
+
+                // Save OpenIGTLink time stamp
+                // TODO: avoid calling New() every time.
+                igtl::TimeStamp::Pointer ts = igtl::TimeStamp::New();
+                buffer->GetTimeStamp(ts);
+                nodeInfo->second = ts->GetSecond();
+                nodeInfo->nanosecond = ts->GetNanosecond();
+                this->InvokeCustomModifiedEvent(vtkMRMLIGTLConnectorNode::IGTLMessageProcessEvent, this);
+                node->Modified();  // in case converter doesn't call any Modifieds itself
+                node->DisableModifiedEventOff();
+                node->InvokePendingModifiedEvent();
+                updatedNode = node;
+                
+                break;
+                // TODO: QueueNode supposes that there is only unique combination of type and node name,
+                // but it should be able to hold multiple nodes.
+                }
+              }
+            collection->Delete();
             }
-          collection->Delete();
           }
         }
-      }
 
-    // If the message is a response to one of the querys in the list
-    // Remove query nodes from the queue that are replied.
-    // Process the removed nodes after the QueryQueueMutex is released
-    // to avoid accidental modification of the query queue as a result of response processing.
-    std::vector< vtkMRMLIGTLQueryNode* > repliedQueryNodes;
-    this->QueryQueueMutex->Lock();
-    if (this->QueryWaitingQueue.size() > 0 && updatedNode != NULL)
-      {
-      for (std::list< vtkWeakPointer<vtkMRMLIGTLQueryNode> >::iterator iter = this->QueryWaitingQueue.begin();
-        iter != this->QueryWaitingQueue.end(); /* increment in the loop to allow erase */ )
+      // If the message is a response to one of the querys in the list
+      // Remove query nodes from the queue that are replied.
+      // Process the removed nodes after the QueryQueueMutex is released
+      // to avoid accidental modification of the query queue as a result of response processing.
+      std::vector< vtkMRMLIGTLQueryNode* > repliedQueryNodes;
+      this->QueryQueueMutex->Lock();
+      if (this->QueryWaitingQueue.size() > 0 && updatedNode != NULL)
         {
-        if (iter->GetPointer()==NULL)
+        for (std::list< vtkWeakPointer<vtkMRMLIGTLQueryNode> >::iterator iter = this->QueryWaitingQueue.begin();
+          iter != this->QueryWaitingQueue.end(); /* increment in the loop to allow erase */ )
           {
-          // the node has been deleted, so remove it from the list
-          iter = this->QueryWaitingQueue.erase(iter);
-          continue;
-          }
-        // If there is a query that has either the same device name as
-        // the incominig message or a NULL name.
-        // If multiple queries that meet the condition then they will all be processed.
-        if (strncmp((*iter)->GetIGTLName(), buffer->GetDeviceType(), IGTL_HEADER_TYPE_SIZE) == 0 &&
-            (strlen((*iter)->GetIGTLDeviceName())==0 ||
-             strncmp((*iter)->GetIGTLDeviceName(), buffer->GetDeviceName(), IGTL_HEADER_NAME_SIZE) == 0))
-          {
-          repliedQueryNodes.push_back(*iter);
-          (*iter)->SetConnectorNodeID("");
-          iter = this->QueryWaitingQueue.erase(iter);
-          }
-        else
-          {
-          iter++;
+          if (iter->GetPointer()==NULL)
+            {
+            // the node has been deleted, so remove it from the list
+            iter = this->QueryWaitingQueue.erase(iter);
+            continue;
+            }
+          // If there is a query that has either the same device name as
+          // the incominig message or a NULL name.
+          // If multiple queries that meet the condition then they will all be processed.
+          if (strncmp((*iter)->GetIGTLName(), buffer->GetDeviceType(), IGTL_HEADER_TYPE_SIZE) == 0 &&
+              (strlen((*iter)->GetIGTLDeviceName())==0 ||
+               strncmp((*iter)->GetIGTLDeviceName(), buffer->GetDeviceName(), IGTL_HEADER_NAME_SIZE) == 0))
+            {
+            repliedQueryNodes.push_back(*iter);
+            (*iter)->SetConnectorNodeID("");
+            iter = this->QueryWaitingQueue.erase(iter);
+            }
+          else
+            {
+            iter++;
+            }
           }
         }
-      }
-    this->QueryQueueMutex->Unlock();
+      this->QueryQueueMutex->Unlock();
 
-    // Update query nodes that successfully received response
-    for (std::vector< vtkMRMLIGTLQueryNode* >::iterator iter = repliedQueryNodes.begin(); iter != repliedQueryNodes.end(); ++iter)
-      {
-      (*iter)->SetQueryStatus(vtkMRMLIGTLQueryNode::STATUS_SUCCESS);
-      (*iter)->SetResponseDataNodeID(updatedNode->GetID());
-      (*iter)->InvokeEvent(vtkMRMLIGTLQueryNode::ResponseEvent);
+      // Update query nodes that successfully received response
+      for (std::vector< vtkMRMLIGTLQueryNode* >::iterator iter = repliedQueryNodes.begin(); iter != repliedQueryNodes.end(); ++iter)
+        {
+        (*iter)->SetQueryStatus(vtkMRMLIGTLQueryNode::STATUS_SUCCESS);
+        (*iter)->SetResponseDataNodeID(updatedNode->GetID());
+        (*iter)->InvokeEvent(vtkMRMLIGTLQueryNode::ResponseEvent);
+        }
+      this->InvokeEvent(vtkMRMLIGTLConnectorNode::ReceiveEvent);
+      this->CurrentIGTLMessage = NULL;
+      circBuffer->EndPull();
       }
-    this->InvokeEvent(vtkMRMLIGTLConnectorNode::ReceiveEvent);
-    this->CurrentIGTLMessage = NULL;
-    circBuffer->EndPull();
     }
 
   // Remove query nodes from the queue that are expired.

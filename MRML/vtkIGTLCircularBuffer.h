@@ -27,7 +27,7 @@
 // STD includes
 #include <string>
 
-#define IGTLCB_CIRC_BUFFER_SIZE    3
+#define IGTLCB_CIRC_BUFFER_SIZE    10
 
 class vtkMutexLock;
 
@@ -47,6 +47,7 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLCircularBuffer : public
   igtl::MessageBase::Pointer GetPushBuffer();
 
   int            StartPull();
+  int            StartPullAtIndex(int pullIndex);
   void           EndPull();
   igtl::MessageBase::Pointer GetPullBuffer();
 
@@ -70,7 +71,7 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLCircularBuffer : public
   unsigned char*     Data[IGTLCB_CIRC_BUFFER_SIZE];
 
   igtl::MessageBase::Pointer Messages[IGTLCB_CIRC_BUFFER_SIZE];
-
+  bool MessagesIsProcessed[IGTLCB_CIRC_BUFFER_SIZE];
 };
 
 #endif //__vtkIGTLCircularBuffer_h
