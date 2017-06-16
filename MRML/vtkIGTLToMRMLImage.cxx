@@ -277,7 +277,7 @@ int vtkIGTLToMRMLImage::UnpackIGTLMessage(igtl::MessageBase::Pointer buffer)
 
 
 //---------------------------------------------------------------------------
-int vtkIGTLToMRMLImage::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node)
+int vtkIGTLToMRMLImage::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node, int modify)
 {
   vtkMRMLVolumeNode* volumeNode = vtkMRMLVolumeNode::SafeDownCast(node);
   if (volumeNode==NULL)

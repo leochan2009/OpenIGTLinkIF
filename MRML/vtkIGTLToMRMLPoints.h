@@ -38,7 +38,7 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLToMRMLPoints : public v
   virtual vtkMRMLNode* CreateNewNode(vtkMRMLScene* scene, const char* name);
 
   //BTX
-  virtual int          IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node);
+  virtual int          IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node, int modify);
   //ETX
   virtual int          MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg);
 

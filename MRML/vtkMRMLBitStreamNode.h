@@ -73,7 +73,7 @@ public:
   {
     if(vectorVolumeNode)
     {
-      converter->IGTLToMRML(buffer, vectorVolumeNode);
+      converter->IGTLToMRML(buffer, vectorVolumeNode, true);
     }
   };
   

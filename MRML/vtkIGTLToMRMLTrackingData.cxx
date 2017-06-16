@@ -80,7 +80,7 @@ vtkIntArray* vtkIGTLToMRMLTrackingData::GetNodeEvents()
 
 
 //---------------------------------------------------------------------------
-int vtkIGTLToMRMLTrackingData::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node)
+int vtkIGTLToMRMLTrackingData::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node, int modify)
 {
 
   if (strcmp(node->GetNodeTagName(), "IGTLTrackingDataSplitter") != 0)

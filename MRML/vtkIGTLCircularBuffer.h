@@ -27,7 +27,7 @@
 // STD includes
 #include <string>
 
-#define IGTLCB_CIRC_BUFFER_SIZE    10
+#define IGTLCB_CIRC_BUFFER_SIZE    20
 
 class vtkMutexLock;
 

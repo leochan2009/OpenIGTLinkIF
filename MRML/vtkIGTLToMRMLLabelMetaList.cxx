@@ -71,7 +71,7 @@ vtkIntArray* vtkIGTLToMRMLLabelMetaList::GetNodeEvents()
 }
 
 //---------------------------------------------------------------------------
-int vtkIGTLToMRMLLabelMetaList::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node)
+int vtkIGTLToMRMLLabelMetaList::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node, int modify)
 {
   if (strcmp(node->GetNodeTagName(), "LabelMetaList") != 0)
     {

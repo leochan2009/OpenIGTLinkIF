@@ -114,7 +114,7 @@ vtkSlicerOpenIGTLinkIFLogic* vtkIGTLToMRMLBase::GetOpenIGTLinkIFLogic()
 }
 
 //---------------------------------------------------------------------------
-int vtkIGTLToMRMLBase::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node)
+int vtkIGTLToMRMLBase::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node, int modify)
 {
   if(buffer && node)
     {

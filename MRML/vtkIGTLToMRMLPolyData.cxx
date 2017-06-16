@@ -128,7 +128,7 @@ vtkIntArray* vtkIGTLToMRMLPolyData::GetNodeEvents()
 
 
 //---------------------------------------------------------------------------
-int vtkIGTLToMRMLPolyData::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node)
+int vtkIGTLToMRMLPolyData::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node, int modify)
 {
 
   vtkMRMLModelNode* modelNode = vtkMRMLModelNode::SafeDownCast(node);

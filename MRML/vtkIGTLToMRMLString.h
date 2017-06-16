@@ -40,7 +40,7 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLToMRMLString : public v
   const char*          GetIGTLName(int index)   { return this->IGTLNames[index].c_str(); };
 
   //BTX
-  virtual int          IGTLToMRML( igtl::MessageBase::Pointer buffer, vtkMRMLNode* node );
+  virtual int          IGTLToMRML( igtl::MessageBase::Pointer buffer, vtkMRMLNode* node, int modify);
   //ETX
   virtual int          MRMLToIGTL( unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg );
 

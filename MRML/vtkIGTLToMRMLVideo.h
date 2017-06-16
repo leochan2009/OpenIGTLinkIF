@@ -64,14 +64,18 @@ public:
   virtual const char*  GetMRMLName() { return "VectorVolume"; };
   virtual vtkIntArray* GetNodeEvents();
   virtual vtkMRMLNode* CreateNewNode(vtkMRMLScene* scene, const char* name);
-  virtual int          IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node);
+  virtual int          IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node, int modify);
   virtual int          MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg);
   vtkMRMLNode* CreateNewNodeWithMessage(vtkMRMLScene* scene, const char* name, igtl::MessageBase::Pointer incomingVideoMessage);
   void SetDefaultDisplayNode(vtkMRMLVolumeNode *volumeNode, int numberOfComponents);
   
   void CenterImage(vtkMRMLVolumeNode *volumeNode);
   
-  GenericDecoder* VideoStreamDecoder[VideoThreadMaxNumber];
+  GenericDecoder* VideoStreamDecoderVPX[VideoThreadMaxNumber];
+  
+  GenericDecoder* VideoStreamDecoderX265[VideoThreadMaxNumber];
+  
+  GenericDecoder* VideoStreamDecoderH264[VideoThreadMaxNumber];
   
   SourcePicture* pDecodedPic;
   

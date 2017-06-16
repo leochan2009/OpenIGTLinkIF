@@ -63,11 +63,27 @@ void vtkMRMLBitStreamNode::SetUpMRMLNodeAndConverter(const char* name)
     int i = 0;
     for (i = 0; i< VideoThreadMaxNumber; i++)
     {
-      if (converter->VideoStreamDecoder[i]->GetDeviceName().compare("")==0)
+#if OpenIGTLink_BUILD_VPX
+      if(converter->VideoStreamDecoderVPX[i]->GetDeviceName().compare("")==0)
       {
-        converter->VideoStreamDecoder[i]->SetDeviceName(name);
+        converter->VideoStreamDecoderVPX[i]->SetDeviceName(name);
         break;
       }
+#endif
+#if OpenIGTLink_LINK_X265
+      if(converter->VideoStreamDecoderX265[i]->GetDeviceName().compare("")==0)
+      {
+        converter->VideoStreamDecoderX265[i]->SetDeviceName(name);
+        break;
+      }
+#endif
+#if OpenIGTLink_BUILD_H264
+      if(converter->VideoStreamDecoderH264[i]->GetDeviceName().compare("")==0)
+      {
+        converter->VideoStreamDecoderH264[i]->SetDeviceName(name);
+        break;
+      }
+#endif
     }
     converter->SetDefaultDisplayNode(vectorVolumeNode,3);
     converter->CenterImage(vectorVolumeNode);

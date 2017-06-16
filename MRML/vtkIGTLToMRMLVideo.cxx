@@ -47,11 +47,13 @@ vtkIGTLToMRMLVideo::vtkIGTLToMRMLVideo()
   for (int i = 0; i< VideoThreadMaxNumber; i++)
   {
 #if OpenIGTLink_BUILD_VPX
-    VideoStreamDecoder[i] = new VPXDecoder();
-#elif OpenIGTLink_LINK_X265
-    VideoStreamDecoder[i] = new H265Decoder();
-#elif OpenIGTLink_BUILD_H264
-    VideoStreamDecoder[i] = new H264Decoder();
+    VideoStreamDecoderVPX[i] = new VPXDecoder();
+#endif
+#if OpenIGTLink_LINK_X265
+    VideoStreamDecoderX265[i] = new H265Decoder();
+#endif
+#if OpenIGTLink_BUILD_H264
+    VideoStreamDecoderH264[i] = new H264Decoder();
 #endif
   }
   pDecodedPic = new SourcePicture();
@@ -98,7 +100,7 @@ vtkIntArray* vtkIGTLToMRMLVideo::GetNodeEvents()
 }
 
 //---------------------------------------------------------------------------
-int vtkIGTLToMRMLVideo::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node)
+int vtkIGTLToMRMLVideo::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node, int modify)
 {
   // Create a message buffer to receive image data
   vtkMRMLVectorVolumeNode* volumeNode = vtkMRMLVectorVolumeNode::SafeDownCast(node);
@@ -134,27 +136,79 @@ int vtkIGTLToMRMLVideo::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
       }
       std::string deviceName(buffer->GetDeviceName()); // buffer has the header information, the videoMsg has not device name information.
       int currentDecoderIndex = -1;
+      GenericDecoder * VideoStreamDecoder = NULL;
       for (int i = 0; i < VideoThreadMaxNumber; i++)
       {
-        if (deviceName.compare(VideoStreamDecoder[i]->GetDeviceName()) == 0)
+        std::string decoderName = "";
+        if (videoMsg->GetCodecType().compare(CodecNameForH264) == 0 && OpenIGTLink_BUILD_H264)
         {
-          currentDecoderIndex = i;
-          break;
+          decoderName = VideoStreamDecoderH264[i]->GetDeviceName();
+          if (deviceName.compare(decoderName) == 0)
+          {
+            currentDecoderIndex = i;
+            VideoStreamDecoder = VideoStreamDecoderH264[currentDecoderIndex];
+            break;
+          }
+        }
+        else if(videoMsg->GetCodecType().compare(CodecNameForVPX) == 0 && OpenIGTLink_BUILD_VPX)
+        {
+          decoderName = VideoStreamDecoderVPX[i]->GetDeviceName();
+          if (deviceName.compare(decoderName) == 0)
+          {
+            currentDecoderIndex = i;
+            VideoStreamDecoder = VideoStreamDecoderVPX[currentDecoderIndex];
+            break;
+          }
+        }
+        else if(videoMsg->GetCodecType().compare(CodecNameForX265) == 0 && OpenIGTLink_LINK_X265)
+        {
+          decoderName = VideoStreamDecoderX265[i]->GetDeviceName();
+          if (deviceName.compare(decoderName) == 0)
+          {
+            currentDecoderIndex = i;
+            VideoStreamDecoder = VideoStreamDecoderX265[currentDecoderIndex];
+            break;
+          }
         }
       }
       if (currentDecoderIndex<0)
       {
         for (int i = 0; i < VideoThreadMaxNumber; i++)
         {
-          if (VideoStreamDecoder[i]->GetDeviceName().compare("") == 0)
+          std::string decoderName = "";
+          if (videoMsg->GetCodecType().compare(CodecNameForH264) == 0 && OpenIGTLink_BUILD_H264)
           {
-            currentDecoderIndex = i;
-            break;
+            if (VideoStreamDecoderH264[i]->GetDeviceName().compare("") == 0)
+            {
+              currentDecoderIndex = i;
+              VideoStreamDecoderH264[currentDecoderIndex]->GetDeviceName() = deviceName;
+              VideoStreamDecoder = VideoStreamDecoderH264[currentDecoderIndex];
+              break;
+            }
+          }
+          else if(videoMsg->GetCodecType().compare(CodecNameForVPX) == 0 && OpenIGTLink_BUILD_VPX)
+          {
+            if (VideoStreamDecoderVPX[i]->GetDeviceName().compare("") == 0)
+            {
+              currentDecoderIndex = i;
+              VideoStreamDecoderVPX[currentDecoderIndex]->GetDeviceName() = deviceName;
+              VideoStreamDecoder = VideoStreamDecoderVPX[currentDecoderIndex];
+              break;
+            }
+          }
+          else if(videoMsg->GetCodecType().compare(CodecNameForX265) == 0 && OpenIGTLink_LINK_X265)
+          {
+            if (VideoStreamDecoderX265[i]->GetDeviceName().compare("") == 0)
+            {
+              currentDecoderIndex = i;
+              VideoStreamDecoderX265[currentDecoderIndex]->GetDeviceName() = deviceName;
+              VideoStreamDecoder = VideoStreamDecoderX265[currentDecoderIndex];
+              break;
+            }
           }
         }
-        VideoStreamDecoder[currentDecoderIndex]->GetDeviceName() = deviceName;
       }
-      if(currentDecoderIndex>=0)
+      if(currentDecoderIndex>=0 && VideoStreamDecoder)
       {
         vtkSmartPointer<vtkImageData> imageData = volumeNode->GetImageData();
         int32_t Width = videoMsg->GetWidth();
@@ -171,7 +225,7 @@ int vtkIGTLToMRMLVideo::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
           pDecodedPic->data[0] = new igtl_uint8[Width * Height*3/2];
           memset(pDecodedPic->data[0], 0, Width * Height * 3 / 2);
         }
-        // For latency and frame loss rate evaluatoin
+        /*// For latency and frame loss rate evaluatoin
         std::cerr<<" FrameIndex: "<<videoMsg->GetMessageID()<<" "<<videoMsg->GetBitStreamSize()<<std::endl;
         
         FILE* pEvalFile = NULL;
@@ -198,14 +252,13 @@ int vtkIGTLToMRMLVideo::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
         line.append(std::to_string(timeStamp->GetSecond()*1e9+timeStamp->GetNanosecond())).append(" ");
         timeStamp->GetTime();
         line.append(std::to_string(timeStamp->GetSecond()*1e9+timeStamp->GetNanosecond())).append(" ");
-        //------------------------------------------
-        VideoStreamDecoder[currentDecoderIndex]->SetIsCompressedData(true);
-        if(!VideoStreamDecoder[currentDecoderIndex]->DecodeVideoMSGIntoSingleFrame(videoMsg, pDecodedPic))
+        //------------------------------------------*/
+        if(!VideoStreamDecoder->DecodeVideoMSGIntoSingleFrame(videoMsg, pDecodedPic))
         {
           pDecodedPic->~SourcePicture();
           return 0;
         }
-        // For latency and frame loss rate evaluatoin
+        /*// For latency and frame loss rate evaluatoin
         timeStamp->GetTime();
         line.append(std::to_string(timeStamp->GetSecond()*1e9+timeStamp->GetNanosecond())).append(" ");
         
@@ -215,7 +268,7 @@ int vtkIGTLToMRMLVideo::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
         //fwrite(pDecodedPic->data[0], 1, Width * Height, testFile);
         //fclose(testFile);
         //testFile = NULL;
-        //-----------------------------------
+        //-----------------------------------*/
         igtl_uint16 frameType = videoMsg->GetFrameType();
         bool isGrayImage = false;
         if(frameType > 0x00FF)
@@ -237,23 +290,23 @@ int vtkIGTLToMRMLVideo::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
         }
         if (isGrayImage)
         {
-          VideoStreamDecoder[currentDecoderIndex]->ConvertYUVToGrayImage(pDecodedPic->data[0], (uint8_t*)imageData->GetScalarPointer(), Height, Width);
+          VideoStreamDecoder->ConvertYUVToGrayImage(pDecodedPic->data[0], (uint8_t*)imageData->GetScalarPointer(), Height, Width);
         }
         else
         {
-          VideoStreamDecoder[currentDecoderIndex]->ConvertYUVToRGB(pDecodedPic->data[0], (uint8_t*)imageData->GetScalarPointer(),Height, Width);
+          VideoStreamDecoder->ConvertYUVToRGB(pDecodedPic->data[0], (uint8_t*)imageData->GetScalarPointer(),Height, Width);
         }
         imageData->Modified();
         volumeNode->SetAndObserveImageData(imageData);
         volumeNode->Modified();
-        timeStamp->GetTime();
+        /*timeStamp->GetTime();
         line.append(std::to_string(timeStamp->GetSecond()*1e9+timeStamp->GetNanosecond())).append("\r\n");
         if(pEvalFile)
         {
           fwrite(line.c_str(), 1, line.size(), pEvalFile);
         }
         fclose(pEvalFile);
-        pEvalFile = NULL;
+        pEvalFile = NULL;*/
         return 1;
       }
     }
@@ -358,11 +411,27 @@ vtkMRMLNode* vtkIGTLToMRMLVideo::CreateNewNodeWithMessage(vtkMRMLScene* scene, c
   int i = 0;
   for (i = 0; i< VideoThreadMaxNumber; i++)
   {
-    if (VideoStreamDecoder[i]->GetDeviceName().compare("")==0)
+#if OpenIGTLink_BUILD_VPX
+    if(this->VideoStreamDecoderVPX[i]->GetDeviceName().compare("")==0)
     {
-      VideoStreamDecoder[i]->SetDeviceName(name);
+      this->VideoStreamDecoderVPX[i]->SetDeviceName(name);
       break;
     }
+#endif
+#if OpenIGTLink_LINK_X265
+    if(this->VideoStreamDecoderX265[i]->GetDeviceName().compare("")==0)
+    {
+      this->VideoStreamDecoderX265[i]->SetDeviceName(name);
+      break;
+    }
+#endif
+#if OpenIGTLink_BUILD_H264
+    if(this->VideoStreamDecoderH264[i]->GetDeviceName().compare("")==0)
+    {
+      this->VideoStreamDecoderH264[i]->SetDeviceName(name);
+      break;
+    }
+#endif
   }
   int32_t Width = 0;
   int32_t Height = 0;

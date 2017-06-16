@@ -73,7 +73,7 @@ vtkIntArray* vtkIGTLToMRMLStatus::GetNodeEvents()
 }
 
 //---------------------------------------------------------------------------
-int vtkIGTLToMRMLStatus::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node)
+int vtkIGTLToMRMLStatus::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node, int modify)
 {
   vtkIGTLToMRMLBase::IGTLToMRML(buffer, node);
 

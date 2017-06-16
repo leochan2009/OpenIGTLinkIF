@@ -72,7 +72,7 @@ vtkIntArray* vtkIGTLToMRMLPoints::GetNodeEvents()
 
 
 //---------------------------------------------------------------------------
-int vtkIGTLToMRMLPoints::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node)
+int vtkIGTLToMRMLPoints::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node, int modify)
 {
   if (strcmp(node->GetNodeTagName(), this->GetMRMLName()) != 0)
     {

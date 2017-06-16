@@ -75,7 +75,7 @@ vtkIntArray* vtkIGTLToMRMLImageMetaList::GetNodeEvents()
 }
 
 //---------------------------------------------------------------------------
-int vtkIGTLToMRMLImageMetaList::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node)
+int vtkIGTLToMRMLImageMetaList::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node, int modify)
 {
   if (strcmp(node->GetNodeTagName(), "ImageMetaList") != 0)
     {

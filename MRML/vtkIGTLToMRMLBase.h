@@ -107,7 +107,8 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLToMRMLBase : public vtk
   // Functions to convert OpenIGTLink message to MRML node.
   // If mrmlNode is QueryNode, the function will generate query node. (event is not used.)
   virtual int          IGTLToMRML(igtl::MessageBase::Pointer buffer,
-                                  vtkMRMLNode* node);
+                                  vtkMRMLNode* node,
+                                  int modify=true);
 
   // Description:
   // Functions to generate an OpenIGTLink message
