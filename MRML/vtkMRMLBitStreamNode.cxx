@@ -63,7 +63,7 @@ void vtkMRMLBitStreamNode::SetUpMRMLNodeAndConverter(const char* name)
     int i = 0;
     for (i = 0; i< VideoThreadMaxNumber; i++)
     {
-#if OpenIGTLink_BUILD_VPX
+#if OpenIGTLink_LINK_VP9
       if(converter->VideoStreamDecoderVPX[i]->GetDeviceName().compare("")==0)
       {
         converter->VideoStreamDecoderVPX[i]->SetDeviceName(name);
@@ -77,7 +77,7 @@ void vtkMRMLBitStreamNode::SetUpMRMLNodeAndConverter(const char* name)
         break;
       }
 #endif
-#if OpenIGTLink_BUILD_H264
+#if OpenIGTLink_LINK_H264
       if(converter->VideoStreamDecoderH264[i]->GetDeviceName().compare("")==0)
       {
         converter->VideoStreamDecoderH264[i]->SetDeviceName(name);

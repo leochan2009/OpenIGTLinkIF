@@ -20,12 +20,12 @@
 #include "vtkSlicerOpenIGTLinkIFModuleMRMLExport.h"
 
 // OpenIGTLink includes
-#include <igtlVideoMessage.h>
-#if OpenIGTLink_BUILD_H264
+#include "igtlVideoMessage.h"
+#if OpenIGTLink_LINK_H264
 #include "H264Decoder.h"
 #endif
-#if OpenIGTLink_BUILD_VPX
-#include "VPXDecoder.h"
+#if OpenIGTLink_LINK_VP9
+#include "VP9Decoder.h"
 #endif
 #if OpenIGTLink_LINK_X265
 #include "H265Decoder.h"

@@ -46,13 +46,13 @@ vtkIGTLToMRMLVideo::vtkIGTLToMRMLVideo()
 {
   for (int i = 0; i< VideoThreadMaxNumber; i++)
   {
-#if OpenIGTLink_BUILD_VPX
-    VideoStreamDecoderVPX[i] = new VPXDecoder();
+#if OpenIGTLink_LINK_VP9
+    VideoStreamDecoderVPX[i] = new VP9Decoder();
 #endif
 #if OpenIGTLink_LINK_X265
     VideoStreamDecoderX265[i] = new H265Decoder();
 #endif
-#if OpenIGTLink_BUILD_H264
+#if OpenIGTLink_LINK_H264
     VideoStreamDecoderH264[i] = new H264Decoder();
 #endif
   }
@@ -140,7 +140,7 @@ int vtkIGTLToMRMLVideo::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
       for (int i = 0; i < VideoThreadMaxNumber; i++)
       {
         std::string decoderName = "";
-        if (videoMsg->GetCodecType().compare(CodecNameForH264) == 0 && OpenIGTLink_BUILD_H264)
+        if (videoMsg->GetCodecType().compare(CodecNameForH264) == 0 && OpenIGTLink_LINK_H264)
         {
           decoderName = VideoStreamDecoderH264[i]->GetDeviceName();
           if (deviceName.compare(decoderName) == 0)
@@ -150,7 +150,7 @@ int vtkIGTLToMRMLVideo::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
             break;
           }
         }
-        else if(videoMsg->GetCodecType().compare(CodecNameForVPX) == 0 && OpenIGTLink_BUILD_VPX)
+        else if(videoMsg->GetCodecType().compare(CodecNameForVPX) == 0 && OpenIGTLink_LINK_VP9)
         {
           decoderName = VideoStreamDecoderVPX[i]->GetDeviceName();
           if (deviceName.compare(decoderName) == 0)
@@ -176,7 +176,7 @@ int vtkIGTLToMRMLVideo::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
         for (int i = 0; i < VideoThreadMaxNumber; i++)
         {
           std::string decoderName = "";
-          if (videoMsg->GetCodecType().compare(CodecNameForH264) == 0 && OpenIGTLink_BUILD_H264)
+          if (videoMsg->GetCodecType().compare(CodecNameForH264) == 0 && OpenIGTLink_LINK_H264)
           {
             if (VideoStreamDecoderH264[i]->GetDeviceName().compare("") == 0)
             {
@@ -186,7 +186,7 @@ int vtkIGTLToMRMLVideo::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
               break;
             }
           }
-          else if(videoMsg->GetCodecType().compare(CodecNameForVPX) == 0 && OpenIGTLink_BUILD_VPX)
+          else if(videoMsg->GetCodecType().compare(CodecNameForVPX) == 0 && OpenIGTLink_LINK_VP9)
           {
             if (VideoStreamDecoderVPX[i]->GetDeviceName().compare("") == 0)
             {
@@ -411,7 +411,7 @@ vtkMRMLNode* vtkIGTLToMRMLVideo::CreateNewNodeWithMessage(vtkMRMLScene* scene, c
   int i = 0;
   for (i = 0; i< VideoThreadMaxNumber; i++)
   {
-#if OpenIGTLink_BUILD_VPX
+#if OpenIGTLink_LINK_VP9
     if(this->VideoStreamDecoderVPX[i]->GetDeviceName().compare("")==0)
     {
       this->VideoStreamDecoderVPX[i]->SetDeviceName(name);
@@ -425,7 +425,7 @@ vtkMRMLNode* vtkIGTLToMRMLVideo::CreateNewNodeWithMessage(vtkMRMLScene* scene, c
       break;
     }
 #endif
-#if OpenIGTLink_BUILD_H264
+#if OpenIGTLink_LINK_H264
     if(this->VideoStreamDecoderH264[i]->GetDeviceName().compare("")==0)
     {
       this->VideoStreamDecoderH264[i]->SetDeviceName(name);
