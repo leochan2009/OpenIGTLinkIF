@@ -18,6 +18,7 @@ Version:   $Revision: 1.2 $
 #include "igtlioCommandDevice.h"
 #include "igtlioPolyDataDevice.h"
 #include "igtlioStringDevice.h"
+#include "igtlioVideoDevice.h"
 #include "igtlOSUtil.h"
 
 // OpenIGTLinkIF MRML includes
@@ -176,22 +177,43 @@ vtkMRMLNode* vtkMRMLIGTLConnectorNode::GetOrAddMRMLNodeforDevice(igtlio::Device*
     }
   
   // Node not found and add the node
-  if(strcmp(device->GetDeviceType().c_str(), "IMAGE")==0)
+  if(strcmp(device->GetDeviceType().c_str(), "IMAGE")==0 // to do: add transform node to the volumeNode
+    || strcmp(device->GetDeviceType().c_str(), "VIDEO")==0)
     {
-    igtlio::ImageDevice* imageDevice = reinterpret_cast<igtlio::ImageDevice*>(device);
-    igtlio::ImageConverter::ContentData content = imageDevice->GetContent();
     vtkSmartPointer<vtkMRMLVolumeNode> volumeNode;
-    int numberOfComponents = content.image->GetNumberOfScalarComponents(); //to improve the io module to be able to cope with video data
-    if (numberOfComponents == 1)
+    int numberOfComponents = 1;
+    if (strcmp(device->GetDeviceType().c_str(), "IMAGE")==0)
       {
-      volumeNode = vtkSmartPointer<vtkMRMLScalarVolumeNode>::New();
+      igtlio::ImageDevice* imageDevice = reinterpret_cast<igtlio::ImageDevice*>(device);
+      igtlio::ImageConverter::ContentData content = imageDevice->GetContent();
+      numberOfComponents= content.image->GetNumberOfScalarComponents(); //to improve the io module to be able to cope with video data
+      if (numberOfComponents == 1)
+        {
+        volumeNode = vtkSmartPointer<vtkMRMLScalarVolumeNode>::New();
+        }
+      else if (numberOfComponents > 1)
+        {
+        volumeNode = vtkSmartPointer<vtkMRMLVectorVolumeNode>::New();
+        }
+        volumeNode->SetAndObserveImageData(content.image);
+        volumeNode->SetName(imageDevice->GetDeviceName().c_str());
       }
-    else if (numberOfComponents > 1)
+    else if (strcmp(device->GetDeviceType().c_str(), "VIDEO")==0)
       {
-      volumeNode = vtkSmartPointer<vtkMRMLVectorVolumeNode>::New();
+      igtlio::VideoDevice* videoDevice = reinterpret_cast<igtlio::VideoDevice*>(device);
+      igtlio::VideoConverter::ContentData content = videoDevice->GetContent();
+      numberOfComponents= content.image->GetNumberOfScalarComponents(); //to improve the io module to be able to cope with video data
+      if (numberOfComponents == 1)
+        {
+        volumeNode = vtkSmartPointer<vtkMRMLScalarVolumeNode>::New();
+        }
+      else if (numberOfComponents > 1)
+        {
+        volumeNode = vtkSmartPointer<vtkMRMLVectorVolumeNode>::New();
+        }
+        volumeNode->SetAndObserveImageData(content.image);
+        volumeNode->SetName(videoDevice->GetDeviceName().c_str());
       }
-    volumeNode->SetAndObserveImageData(content.image);
-    volumeNode->SetName(imageDevice->GetDeviceName().c_str());
     
     Scene->SaveStateForUndo();
     
